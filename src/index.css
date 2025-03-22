@@ -1,0 +1,189 @@
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Base colors */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 12%;
+
+    /* Primary - Soft blue */
+    --primary: 210 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Light gray */
+    --secondary: 210 20% 98%;
+    --secondary-foreground: 215 25% 27%;
+
+    /* Fire - Warm red */
+    --fire: 5 90% 55%;
+    --fire-muted: 5 90% 90%;
+    --fire-foreground: 0 0% 100%;
+
+    /* Safety - Green */
+    --safety: 142 70% 45%;
+    --safety-muted: 142 70% 90%;
+    --safety-foreground: 0 0% 100%;
+
+    /* Muted - Gray */
+    --muted: 210 15% 96%;
+    --muted-foreground: 215 25% 40%;
+
+    /* Accent - Light blue */
+    --accent: 210 40% 96%;
+    --accent-foreground: 215 25% 27%;
+
+    /* Destructive - Red */
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* UI elements */
+    --border: 215 25% 92%;
+    --input: 215 25% 92%;
+    --ring: 210 100% 50%;
+
+    /* Border radius */
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: "Inter", sans-serif;
+  }
+
+  /* Glass effect utilities */
+  .glass {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-glass;
+  }
+
+  .glass-card {
+    @apply bg-white/90 backdrop-blur-md border border-white/20 shadow-card rounded-xl;
+  }
+
+  .glass-dark {
+    @apply bg-black/10 backdrop-blur-md border border-white/10 shadow-glass;
+  }
+
+  /* Animation utilities */
+  .animate-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animate-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animate-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animate-delay-400 {
+    animation-delay: 400ms;
+  }
+
+  .animate-delay-500 {
+    animation-delay: 500ms;
+  }
+
+  /* Custom scroll bar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer components {
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium tracking-wide;
+  }
+
+  .badge-primary {
+    @apply bg-primary/10 text-primary;
+  }
+
+  .badge-fire {
+    @apply bg-fire-muted text-fire;
+  }
+
+  .badge-safety {
+    @apply bg-safety-muted text-safety;
+  }
+
+  .btn-primary {
+    @apply rounded-full bg-primary text-primary-foreground hover:bg-primary/90 
+           inline-flex h-10 items-center justify-center px-6 py-2 text-sm font-medium
+           transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2
+           focus-visible:ring-ring shadow-md hover:shadow-lg active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80
+           inline-flex h-10 items-center justify-center px-6 py-2 text-sm font-medium
+           transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2
+           focus-visible:ring-ring shadow-sm hover:shadow-md active:scale-[0.98];
+  }
+
+  .icon-button {
+    @apply rounded-full p-2 text-muted-foreground hover:bg-muted transition-colors
+           inline-flex items-center justify-center focus-visible:outline-none
+           focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .section-container {
+    @apply container mx-auto px-4 py-16 md:py-24;
+  }
+
+  .heading-hero {
+    @apply text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight leading-tight;
+  }
+
+  .heading-section {
+    @apply text-2xl sm:text-3xl font-bold tracking-tight;
+  }
+
+  .input-field {
+    @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2
+           text-sm ring-offset-background file:border-0 file:bg-transparent
+           file:text-sm file:font-medium placeholder:text-muted-foreground
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+           focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+}
