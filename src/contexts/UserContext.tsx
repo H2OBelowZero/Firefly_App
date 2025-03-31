@@ -5,6 +5,7 @@ import { User } from '@supabase/supabase-js';
 interface UserContextType {
   user: User | null;
   userDetails: {
+    id?: string;
     full_name?: string;
     company?: string;
     role?: string;

@@ -1,193 +1,234 @@
-import React from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Plus, FileIcon, Building2, ClipboardCheck, AlertTriangle } from "lucide-react";
-import ProjectCard from "../components/ProjectCard";
-import DashboardLayout from "@/components/DashboardLayout";
-import { useUser } from "@/contexts/UserContext";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Bell, Calendar, FileText, Users } from 'lucide-react';
+import { useProjects } from '@/contexts/ProjectContext';
+import { useUser } from '@/contexts/UserContext';
+import { supabase } from '@/integrations/supabase/client';
 
-interface Project {
+interface UpcomingEvent {
   id: string;
-  name: string;
-  client_name: string;
-  building_type: string;
-  status: 'draft' | 'review' | 'approved' | 'rejected';
-  compliance_score: number;
-  created_at: string;
-  last_edited_at: string;
-}
-
-interface ProjectStats {
-  total: number;
-  inProgress: number;
-  approved: number;
-  requiresAttention: number;
+  title: string;
+  type: 'project_start' | 'project_end' | 'deadline' | 'review';
+  date: string;
+  project_id: string;
+  project_name: string;
+  description: string;
 }
 
 const Dashboard = () => {
-  const { user, userDetails, loading } = useUser();
-  const navigate = useNavigate();
-  const [projects, setProjects] = React.useState<Project[]>([]);
-  const [stats, setStats] = React.useState<ProjectStats>({
-    total: 0,
-    inProgress: 0,
-    approved: 0,
-    requiresAttention: 0
-  });
-  const [loadingData, setLoadingData] = React.useState(true);
+  const { projects, loading: projectsLoading } = useProjects();
+  const { userDetails } = useUser();
+  const [upcomingEvents, setUpcomingEvents] = React.useState<UpcomingEvent[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  // Redirect to login if not authenticated
   React.useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
+    fetchUpcomingEvents();
+  }, [projects]);
+
+  const fetchUpcomingEvents = async () => {
+    try {
+      // Get project start and end dates
+      const projectEvents = projects.map(project => ({
+        id: `start-${project.id}`,
+        title: `${project.name} - Project Start`,
+        type: 'project_start' as const,
+        date: project.start_date,
+        project_id: project.id,
+        project_name: project.name,
+        description: `Project ${project.name} is starting`
+      })).concat(projects.map(project => ({
+        id: `end-${project.id}`,
+        title: `${project.name} - Project End`,
+        type: 'project_end' as const,
+        date: project.end_date,
+        project_id: project.id,
+        project_name: project.name,
+        description: `Project ${project.name} is ending`
+      })));
+
+      // Get deadlines
+      const { data: deadlines, error: deadlinesError } = await supabase
+        .from('deadlines')
+        .select(`
+          *,
+          projects (
+            name
+          )
+        `)
+        .eq('user_id', userDetails?.id)
+        .gte('due_date', new Date().toISOString())
+        .order('due_date', { ascending: true })
+        .limit(5);
+
+      if (deadlinesError) throw deadlinesError;
+
+      const deadlineEvents = deadlines.map(deadline => ({
+        id: `deadline-${deadline.id}`,
+        title: `${deadline.projects.name} - ${deadline.title}`,
+        type: 'deadline' as const,
+        date: deadline.due_date,
+        project_id: deadline.project_id,
+        project_name: deadline.projects.name,
+        description: deadline.description
+      }));
+
+      // Combine and sort all events
+      const allEvents = [...projectEvents, ...deadlineEvents]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 5);
+
+      setUpcomingEvents(allEvents);
+    } catch (error: any) {
+      console.error('Error fetching upcoming events:', error.message);
+    } finally {
+      setLoading(false);
     }
-  }, [user, loading, navigate]);
-
-  // Fetch projects and calculate stats
-  React.useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(6);
-
-        if (error) throw error;
-
-        setProjects(data || []);
-
-        // Fetch stats
-        const { data: allProjects, error: statsError } = await supabase
-          .from('projects')
-          .select('status');
-
-        if (statsError) throw statsError;
-
-        const projectStats = (allProjects || []).reduce((acc, project) => ({
-          total: acc.total + 1,
-          inProgress: acc.inProgress + (project.status === 'review' ? 1 : 0),
-          approved: acc.approved + (project.status === 'approved' ? 1 : 0),
-          requiresAttention: acc.requiresAttention + (project.status === 'rejected' ? 1 : 0),
-        }), {
-          total: 0,
-          inProgress: 0,
-          approved: 0,
-          requiresAttention: 0
-        });
-
-        setStats(projectStats);
-      } catch (error: any) {
-        console.error('Error fetching projects:', error.message);
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    if (user) {
-      fetchProjects();
-    }
-  }, [user]);
-
-  const handleNewProject = () => {
-    navigate('/projects/wizard');
   };
 
-  const statsArray = [
-    {
-      label: 'Total Projects',
-      value: stats.total,
-      icon: Building2,
-      color: 'text-primary',
-    },
-    {
-      label: 'Approved',
-      value: stats.approved,
-      icon: ClipboardCheck,
-      color: 'text-safety',
-    },
-    {
-      label: 'Needs Review',
-      value: stats.inProgress,
-      icon: AlertTriangle,
-      color: 'text-amber-500',
-    },
-  ];
-
-  if (loading || loadingData) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  const getEventIcon = (type: UpcomingEvent['type']) => {
+    switch (type) {
+      case 'project_start':
+        return <Calendar className="w-4 h-4 text-green-500" />;
+      case 'project_end':
+        return <Calendar className="w-4 h-4 text-red-500" />;
+      case 'deadline':
+        return <FileText className="w-4 h-4 text-yellow-500" />;
+      default:
+        return <Calendar className="w-4 h-4 text-blue-500" />;
+    }
+  };
 
   return (
-    <DashboardLayout>
+    <div className="max-w-7xl mx-auto">
       <div className="space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">
-            Welcome back, {userDetails?.full_name?.split(' ')[0] || 'User'}
-          </h1>
-          <Button onClick={handleNewProject} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Project
-          </Button>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {statsArray.map((stat, index) => (
-            <div
-              key={index}
-              className="rounded-lg border bg-card p-6 text-card-foreground shadow-sm"
-            >
-              <div className="flex items-center gap-2">
-                <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                <h3 className="font-semibold">{stat.label}</h3>
-              </div>
-              <p className="mt-4 text-3xl font-bold">{stat.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <div>
+        {/* Recent Projects */}
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-semibold">Recent Projects</h2>
-            <Button onClick={handleNewProject} variant="outline" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Create Project
-            </Button>
+            <h2 className="text-xl font-semibold">Recent Projects</h2>
+            <Link to="/projects">
+              <Button variant="ghost">View All</Button>
+            </Link>
           </div>
 
-          {loading ? (
+          {projectsLoading ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fire"></div>
             </div>
           ) : projects.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {projects.slice(0, 6).map((project) => (
+                <Link key={project.id} to={`/projects/${project.id}`}>
+                  <Card className="p-6 hover:shadow-lg transition-shadow">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="h-10 w-10 rounded-2xl bg-fire/10 flex items-center justify-center">
+                        <span className="font-bold text-fire">FF</span>
+                      </div>
+                    </div>
+                    <h3 className="font-medium mb-2">{project.name}</h3>
+                    <p className="text-sm text-muted-foreground">{project.client_name}</p>
+                  </Card>
+                </Link>
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
               <h3 className="text-lg font-medium mb-2">No projects yet</h3>
-              <p className="text-muted-foreground mb-4">
+              <p className="text-muted-foreground">
                 Create your first project to get started
               </p>
-              <Button onClick={handleNewProject} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Create Project
-              </Button>
             </div>
           )}
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Quick Stats */}
+          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="h-12 w-12 rounded-2xl bg-fire/10 flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-fire" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Active Projects</p>
+                  <h3 className="text-2xl font-bold">
+                    {projects.filter(p => p.status === 'active').length}
+                  </h3>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="h-12 w-12 rounded-2xl bg-fire/10 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-fire" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Team Members</p>
+                  <h3 className="text-2xl font-bold">12</h3>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="h-12 w-12 rounded-2xl bg-fire/10 flex items-center justify-center">
+                  <Bell className="w-6 h-6 text-fire" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Upcoming Events</p>
+                  <h3 className="text-2xl font-bold">{upcomingEvents.length}</h3>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Upcoming Events */}
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-6">Upcoming Events</h2>
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fire"></div>
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-4">
+                  {upcomingEvents.map((event) => (
+                    <Link
+                      key={event.id}
+                      to={`/projects/${event.project_id}`}
+                      className="block"
+                    >
+                      <div className="p-4 rounded-2xl hover:bg-secondary/80 transition-all duration-200">
+                        <div className="flex items-start space-x-4">
+                          {getEventIcon(event.type)}
+                          <div>
+                            <h3 className="font-medium">{event.title}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(event.date).toLocaleDateString()}
+                            </p>
+                            <p className="text-sm mt-1">{event.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                  {upcomingEvents.length === 0 && (
+                    <p className="text-center text-muted-foreground">No upcoming events</p>
+                  )}
+                </div>
+              </ScrollArea>
+            )}
+          </Card>
         </div>
       </div>
-    </DashboardLayout>
+    </div>
   );
 };
 

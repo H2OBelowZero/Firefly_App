@@ -4,6 +4,21 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import fs from 'fs';
 
+interface SansDocument {
+  id: string;
+  title: string;
+  description: string;
+}
+
+const sansDocuments: SansDocument[] = [
+  {
+    id: "10400-A",
+    title: "SANS 10400-A - 2022 Edition",
+    description: "General Application of the National Building Regulations"
+  },
+  // ... all other documents
+];
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {

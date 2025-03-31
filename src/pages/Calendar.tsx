@@ -4,7 +4,6 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
 import { useUser } from '@/contexts/UserContext';
 import { supabase } from '@/integrations/supabase/client';
-import DashboardLayout from '@/components/DashboardLayout';
 
 interface Deadline {
   id: string;
@@ -16,9 +15,10 @@ interface Deadline {
 }
 
 const Calendar = () => {
-  const [date, setDate] = React.useState<Date | undefined>(new Date());
+  const { userDetails } = useUser();
   const [deadlines, setDeadlines] = React.useState<Deadline[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
 
   React.useEffect(() => {
     fetchDeadlines();
@@ -27,13 +27,9 @@ const Calendar = () => {
   const fetchDeadlines = async () => {
     try {
       const { data, error } = await supabase
-        .from('project_deadlines')
-        .select(`
-          *,
-          projects (
-            name
-          )
-        `)
+        .from('deadlines')
+        .select('*')
+        .eq('user_id', userDetails?.id)
         .order('due_date', { ascending: true });
 
       if (error) throw error;
@@ -43,6 +39,13 @@ const Calendar = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getDeadlinesForDate = (date: Date) => {
+    return deadlines.filter(deadline => {
+      const deadlineDate = new Date(deadline.due_date);
+      return deadlineDate.toDateString() === date.toDateString();
+    });
   };
 
   const getStatusColor = (status: Deadline['status']) => {
@@ -56,59 +59,58 @@ const Calendar = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
   return (
-    <DashboardLayout>
-      <h1 className="text-3xl font-bold mb-8">Calendar</h1>
+    <div className="max-w-7xl mx-auto">
+      <div className="space-y-8">
+        <h1 className="text-3xl font-bold">Calendar</h1>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Calendar Component */}
+          <div className="lg:col-span-2">
+            <Card className="p-6">
+              <CalendarComponent
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                className="rounded-md border"
+              />
+            </Card>
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <Card className="p-6 md:col-span-2">
-          <CalendarComponent
-            mode="single"
-            selected={date}
-            onSelect={setDate}
-            className="rounded-md border"
-          />
-        </Card>
-
-        <div className="space-y-6">
+          {/* Deadlines List */}
           <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Upcoming Deadlines</h2>
-            <div className="space-y-4">
-              {deadlines.map((deadline) => (
-                <div key={deadline.id} className="border-b border-border pb-4 last:border-0 last:pb-0">
-                  <div className="flex items-start justify-between">
-                    <div>
+            <h2 className="text-xl font-semibold mb-6">Deadlines</h2>
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fire"></div>
+              </div>
+            ) : selectedDate ? (
+              <div className="space-y-4">
+                {getDeadlinesForDate(selectedDate).map((deadline) => (
+                  <div
+                    key={deadline.id}
+                    className="p-4 rounded-2xl hover:bg-secondary/80 transition-all duration-200"
+                  >
+                    <div className="flex items-center justify-between mb-2">
                       <h3 className="font-medium">{deadline.title}</h3>
-                      <p className="text-sm text-muted-foreground">{deadline.description}</p>
-                      <p className="text-sm mt-1">
-                        Due: {new Date(deadline.due_date).toLocaleDateString()}
-                      </p>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(deadline.status)}`}>
+                        {deadline.status.charAt(0).toUpperCase() + deadline.status.slice(1)}
+                      </span>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(deadline.status)}`}>
-                      {deadline.status.charAt(0).toUpperCase() + deadline.status.slice(1)}
-                    </span>
+                    <p className="text-sm text-muted-foreground">{deadline.description}</p>
                   </div>
-                </div>
-              ))}
-
-              {deadlines.length === 0 && (
-                <p className="text-muted-foreground text-center py-4">No upcoming deadlines</p>
-              )}
-            </div>
+                ))}
+                {getDeadlinesForDate(selectedDate).length === 0 && (
+                  <p className="text-center text-muted-foreground">No deadlines for this date</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground">Select a date to view deadlines</p>
+            )}
           </Card>
         </div>
       </div>
-    </DashboardLayout>
+    </div>
   );
 };
 

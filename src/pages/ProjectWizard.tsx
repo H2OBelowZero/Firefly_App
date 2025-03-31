@@ -1,21 +1,72 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Building, Users, MapPin, FileText, Clipboard, Check, Upload, X, Plus, Camera, ChevronDown, ChevronUp, BookOpen, Menu, Home, Settings, HelpCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building, Users, MapPin, FileText, Clipboard, Check, Upload, X, Plus, Camera, ChevronDown, ChevronUp, BookOpen, Menu, Home, Settings, HelpCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useProjects } from '@/contexts/ProjectContext';
+import { saveAs } from 'file-saver';
+
+interface ReportType {
+  id: string;
+  name: string;
+  description: string;
+}
+
+const reportTypes: ReportType[] = [
+  {
+    id: "fire_risk_assessment",
+    name: "Fire Risk Assessment Report",
+    description: "Comprehensive evaluation of fire risks and safety measures"
+  },
+  {
+    id: "compliance_assessment",
+    name: "Fire Safety Compliance Assessment Report",
+    description: "Evaluate building design against regulations"
+  },
+  {
+    id: "plan_review",
+    name: "Building Plan Review Report",
+    description: "Ensure fire safety requirements are met in design plans"
+  },
+  {
+    id: "certificate_fitness",
+    name: "Certificate of Fitness Application Report",
+    description: "Support application for regulatory approval"
+  },
+  {
+    id: "rational_design",
+    name: "Rational Design Report",
+    description: "Justify alternative fire safety designs"
+  },
+  {
+    id: "compliance_audit",
+    name: "Compliance Audit Report",
+    description: "Assess existing buildings for regulatory compliance"
+  }
+];
 
 interface ProjectData {
-  // Step 1: Project Setup
-  client_name: string;
-  facility_address: string;
-  occupancy_certificate_status: string;
-  aerial_view_image: string;
-  cad_site_plan: string;
-  pre_1985_building: boolean;
+  reportType: string;
   name: string;
-  
-  // Step 2: Occupancy Classification
+  client_name: string;
+  description: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  company_id: string;
+  company_name: string;
+  facility_process: string;
+  facility_location: {
+    town: string;
+    province: string;
+  };
+  construction_year: number;
   buildings: Array<{
     name: string;
     classification: string;
@@ -27,45 +78,35 @@ interface ProjectData {
       other: string;
     };
     total_floor_area: number;
+    floor_plan: string;
+    cad_drawing: string;
     sans_10400_t_table: string;
     fire_load: {
       commodities: Array<{
         name: string;
-        quantity: number;
-        calorific_value: number;
-        timber_equivalent: number;
+        category: string;
+        minimum_stacking_height: number;
+        storage_type: string;
       }>;
+      total_timber_equivalent: number;
     };
+    aerial_view: string;
   }>;
-  
-  // Step 3: Facility Overview
   zones: Array<{
     name: string;
     photos: string[];
   }>;
-  special_risks: {
-    diesel_tank: {
-      location: string;
-      photo: string;
-    };
-    inverter_canopy: {
-      details: string;
-      photo: string;
-    };
-    pallet_storage: {
-      location: string;
-      photo: string;
-    };
-  };
-  
-  // Step 4: Commodity Classification
+  special_risks: Array<{
+    type: string;
+    location: string;
+    details: string;
+    photo: string;
+  }>;
   storage_details: Array<{
     commodity_type: string;
     category: 'I' | 'II' | 'III' | 'IV';
     stack_height: number;
   }>;
-  
-  // Step 5: Fire Protection Systems
   divisional_separation: {
     fire_rated_walls: boolean;
     fire_rated_doors: boolean;
@@ -77,29 +118,69 @@ interface ProjectData {
     sprinkler_zones: string[];
     hydrant_locations: string[];
   };
-  
-  // Step 6: Escape Routes & Signage
   escape_routes: {
-    travel_distances: string;
-    emergency_lighting_zones: string[];
-    door_rotation_diagrams: string[];
+    routes: Array<{
+      name: string;
+      travel_distance: number;
+      width: number;
+    }>;
   };
+  emergency_staircases: Array<{
+    name: string;
+    width: number;
+    fire_rated: boolean;
+  }>;
   signage: {
-    photoluminescent_signs: boolean;
+    items: Array<{
+      type: string;
+      location: string;
+      photoluminescent: boolean;
+    }>;
   };
-  
-  // Step 7: Special Risks & Mitigation
-  pallet_storage: {
-    fmds_8_24_diagram: string;
-    indoor_photo: string;
+  emergency_lighting: {
+    zones: Array<{
+      name: string;
+      duration: number;
+      lux_level: number;
+    }>;
   };
-  oil_tanks: {
-    indoor_photo: string;
-    outdoor_photo: string;
-    bunding_compliant: boolean;
+  fire_hose_reels: Array<{
+    location: string;
+    hose_length: number;
+    coverage_radius: number;
+  }>;
+  fire_extinguishers: Array<{
+    type: string;
+    location: string;
+    capacity: number;
+  }>;
+  fire_hydrants: Array<{
+    location: string;
+    type: string;
+    flow_rate: number;
+  }>;
+  firewater: {
+    source: string;
+    capacity: number;
+    pressure: number;
   };
-  
-  // Step 8: Final Summary & Recommendations
+  fire_detection: {
+    type: string;
+    zones: number;
+    battery_backup: number;
+  };
+  smoke_ventilation: {
+    zones: Array<{
+      name: string;
+      area: number;
+      ventilation_rate: number;
+    }>;
+  };
+  electrical: {
+    main_supply: number;
+    backup_supply: number;
+    circuit_protection: string;
+  };
   mandatory_actions: string[];
   optional_actions: string[];
   engineer_signoff: {
@@ -107,138 +188,186 @@ interface ProjectData {
     ecsa_number: string;
     signature: string;
   };
+  occupancy_separation: {
+    type: string;
+    rating: number;
+  };
+  separation_requirements: {
+    minimum_distance: number;
+    required_rating: number;
+  };
+  automatic_fire_extinguishment: {
+    areas: Array<{
+      name: string;
+      commodity: string;
+      category: string;
+      storage_type: string;
+      max_stacking_height: number;
+      current_stacking_height: number;
+    }>;
+  };
 }
 
 const ProjectWizard = () => {
-  const [step, setStep] = useState(1);
-  const totalSteps = 8;
   const navigate = useNavigate();
-  const { user } = useUser();
+  const { userDetails } = useUser();
+  const { refreshProjects } = useProjects();
+  const [currentStep, setCurrentStep] = React.useState(1);
+  const totalSteps = 7;
   const [loading, setLoading] = useState(false);
   const [expandedBuildings, setExpandedBuildings] = useState<number[]>([]);
   const [selectedSansDoc, setSelectedSansDoc] = useState<string>("10400-T");
   const [showSansSelector, setShowSansSelector] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
+    zones: true,
+    storage_details: true,
+    sprinkler_zones: true,
+    hydrant_locations: true,
+    emergency_lighting_zones: true,
+    door_rotation_diagrams: true,
+    mandatory_actions: true,
+    optional_actions: true
+  });
 
-  const [projectData, setProjectData] = useState<ProjectData>({
-    // Step 1: Project Setup
-    client_name: "",
-    facility_address: "",
-    occupancy_certificate_status: "",
-    aerial_view_image: "",
-    cad_site_plan: "",
-    pre_1985_building: false,
-    name: "",
-    
-    // Step 2: Occupancy Classification
-    buildings: [],
-    
-    // Step 3: Facility Overview
-    zones: [],
-    special_risks: {
-      diesel_tank: {
-        location: "",
-        photo: "",
-      },
-      inverter_canopy: {
-        details: "",
-        photo: "",
-      },
-      pallet_storage: {
-        location: "",
-        photo: "",
-      },
+  const [formData, setFormData] = React.useState<ProjectData>({
+    reportType: "",
+    name: '',
+    client_name: '',
+    description: '',
+    start_date: '',
+    end_date: '',
+    status: 'active',
+    company_id: userDetails?.company || '',
+    company_name: '',
+    facility_process: '',
+    facility_location: {
+      town: '',
+      province: ''
     },
-    
-    // Step 4: Commodity Classification
+    construction_year: 0,
+    buildings: [],
+    zones: [],
+    special_risks: [],
     storage_details: [],
-    
-    // Step 5: Fire Protection Systems
     divisional_separation: {
       fire_rated_walls: false,
       fire_rated_doors: false,
       penetrations: false,
-      separation_plan: "",
+      separation_plan: '',
     },
     fire_alarm: {
-      panel_layout: "",
+      panel_layout: '',
       sprinkler_zones: [],
       hydrant_locations: [],
     },
-    
-    // Step 6: Escape Routes & Signage
     escape_routes: {
-      travel_distances: "",
-      emergency_lighting_zones: [],
-      door_rotation_diagrams: [],
+      routes: [],
     },
+    emergency_staircases: [],
     signage: {
-      photoluminescent_signs: false,
+      items: [],
     },
-    
-    // Step 7: Special Risks & Mitigation
-    pallet_storage: {
-      fmds_8_24_diagram: "",
-      indoor_photo: "",
+    emergency_lighting: {
+      zones: [],
     },
-    oil_tanks: {
-      indoor_photo: "",
-      outdoor_photo: "",
-      bunding_compliant: false,
+    fire_hose_reels: [],
+    fire_extinguishers: [],
+    fire_hydrants: [],
+    firewater: {
+      source: '',
+      capacity: 0,
+      pressure: 0,
     },
-    
-    // Step 8: Final Summary & Recommendations
+    fire_detection: {
+      type: '',
+      zones: 0,
+      battery_backup: 0,
+    },
+    smoke_ventilation: {
+      zones: [],
+    },
+    electrical: {
+      main_supply: 0,
+      backup_supply: 0,
+      circuit_protection: '',
+    },
     mandatory_actions: [],
     optional_actions: [],
     engineer_signoff: {
-      name: "",
-      ecsa_number: "",
-      signature: "",
+      name: '',
+      ecsa_number: '',
+      signature: '',
+    },
+    occupancy_separation: {
+      type: '',
+      rating: 0
+    },
+    separation_requirements: {
+      minimum_distance: 0,
+      required_rating: 0
+    },
+    automatic_fire_extinguishment: {
+      areas: []
     },
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    setProjectData(prev => ({
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => {
+      if (field.includes('.')) {
+        // Handle nested updates (e.g., 'fire_alarm.panel_layout')
+        const [parent, child] = field.split('.');
+        const parentObj = prev[parent as keyof ProjectData] as Record<string, any>;
+        return {
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }));
+          [parent]: {
+            ...parentObj,
+            [child]: value
+          }
+        };
+      } else {
+        // Handle direct updates
+        return {
+          ...prev,
+          [field]: value
+        };
+      }
+    });
   };
 
   const handleArrayChange = (field: string, index: number, value: any) => {
-    setProjectData(prev => ({
+    setFormData(prev => ({
       ...prev,
       [field]: prev[field].map((item: any, i: number) => i === index ? value : item)
     }));
   };
 
   const handleArrayAdd = (field: string, value: any) => {
-    setProjectData(prev => ({
+    setFormData(prev => ({
       ...prev,
       [field]: [...prev[field], value]
     }));
   };
 
   const handleArrayRemove = (field: string, index: number) => {
-    setProjectData(prev => ({
+    setFormData(prev => ({
       ...prev,
       [field]: prev[field].filter((_: any, i: number) => i !== index)
     }));
   };
 
   const handleStepClick = (stepNumber: number) => {
-    setStep(stepNumber);
+    setCurrentStep(stepNumber);
   };
 
   const nextStep = () => {
-    if (step < totalSteps) {
-      setStep(step + 1);
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
     }
   };
 
   const prevStep = () => {
-    if (step > 1) {
-      setStep(step - 1);
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
     }
   };
 
@@ -262,6 +391,13 @@ const ProjectWizard = () => {
     );
   };
 
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   // Common styles for form elements
   const inputStyles = "w-full px-4 py-2.5 border border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-fire/20 transition-all duration-200";
   const buttonStyles = "px-4 py-2.5 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200";
@@ -269,1675 +405,2479 @@ const ProjectWizard = () => {
   const checkboxWrapperStyles = "flex items-center space-x-3 cursor-pointer group";
   const checkboxStyles = "w-5 h-5 border-2 border-border rounded-xl checked:bg-fire checked:border-fire transition-all duration-200";
 
-  return (
-    <div className="min-h-screen bg-secondary/30 flex">
-      {/* Floating Sidebar */}
-      <aside className={`fixed left-0 top-0 h-screen bg-background/80 backdrop-blur-sm border-r border-border shadow-xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-16'}`}>
-        <div className="h-full flex flex-col p-6">
-          {/* Sidebar Header */}
-          <div className="flex items-center justify-between mb-8">
-            {sidebarOpen && (
-              <div className="flex items-center">
-                <div className="h-10 w-10 rounded-2xl bg-fire flex items-center justify-center shadow-lg">
-                  <span className="font-bold text-white">FF</span>
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      // Create project in Supabase
+      const { data: project, error } = await supabase
+        .from('projects')
+        .insert([
+          {
+            name: formData.company_name,
+            client_name: formData.client_name,
+            facility_process: formData.facility_process,
+            facility_location: formData.facility_location,
+            construction_year: formData.construction_year,
+            divisional_separation: formData.divisional_separation,
+            fire_alarm: formData.fire_alarm,
+            mandatory_actions: formData.mandatory_actions,
+            optional_actions: formData.optional_actions,
+            user_id: userDetails?.id,
+            status: 'active',
+            report_type: formData.reportType
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Generate text file content
+      const fileContent = `Project Information
+===================
+
+Basic Information
+----------------
+Company Name: ${formData.company_name}
+Client Name: ${formData.client_name}
+Facility Process: ${formData.facility_process}
+Location: ${formData.facility_location.town}, ${formData.facility_location.province}
+Construction Year: ${formData.construction_year}
+
+Divisional Separation
+-------------------
+Fire Rated Walls: ${formData.divisional_separation.fire_rated_walls ? 'Yes' : 'No'}
+Fire Rated Doors: ${formData.divisional_separation.fire_rated_doors ? 'Yes' : 'No'}
+Penetrations: ${formData.divisional_separation.penetrations ? 'Yes' : 'No'}
+Separation Plan: ${formData.divisional_separation.separation_plan || 'Not uploaded'}
+
+Fire Alarm System
+----------------
+Panel Layout: ${formData.fire_alarm.panel_layout || 'Not uploaded'}
+Sprinkler Zones: ${formData.fire_alarm.sprinkler_zones.join(', ') || 'None specified'}
+Hydrant Locations: ${formData.fire_alarm.hydrant_locations.join(', ') || 'None specified'}
+
+Mandatory Actions
+----------------
+${formData.mandatory_actions.map((action, index) => `${index + 1}. ${action}`).join('\n')}
+
+Optional Actions
+---------------
+${formData.optional_actions.map((action, index) => `${index + 1}. ${action}`).join('\n')}
+
+Generated on: ${new Date().toLocaleString()}
+`;
+
+      // Create and save the file
+      const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+      saveAs(blob, `${formData.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_project_info.txt`);
+
+      // Refresh projects list
+      await refreshProjects();
+
+      // Show success message
+      toast.success('Project created successfully');
+
+      // Navigate to project details
+      navigate(`/projects/${project.id}`);
+    } catch (error: any) {
+      console.error('Error creating project:', error);
+      toast.error(error.message || 'Failed to create project');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+              <div className="space-y-6">
+                <div className="space-y-2">
+              <Label htmlFor="reportType">Report Type</Label>
+              <select
+                id="reportType"
+                value={formData.reportType}
+                onChange={(e) => handleInputChange('reportType', e.target.value)}
+                className="w-full p-2 border rounded-md bg-background"
+              >
+                <option value="">Select a report type</option>
+                {reportTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </select>
+              {formData.reportType && (
+                <p className="text-sm text-muted-foreground">
+                  {reportTypes.find(t => t.id === formData.reportType)?.description}
+                </p>
+              )}
                 </div>
-                <span className="font-bold text-lg ml-3">FireFly</span>
-              </div>
-            )}
-            <button 
-              className="p-2.5 hover:bg-secondary/80 rounded-2xl transition-all duration-200"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Navigation Links */}
-          <div className="flex-1 space-y-8">
-            {/* Main Navigation */}
-            <div>
-              <Link to="/dashboard" className="flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200">
-                <Home className="w-5 h-5" />
-                {sidebarOpen && <span>Dashboard</span>}
-              </Link>
-            </div>
-
-            {/* SANS Document Selection */}
-            <div>
-              <div className={`text-sm font-medium mb-3 ${sidebarOpen ? 'block' : 'hidden'}`}>
-                SANS Documents
-              </div>
-              <div className="space-y-2">
-                {["10400-T", "10400-A", "10131"].map((doc) => (
-                  <button
-                    key={doc}
-                    className={`w-full flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200 ${
-                      selectedSansDoc === doc ? 'bg-fire/10 text-fire shadow-lg' : ''
-                    }`}
-                    onClick={() => setSelectedSansDoc(doc)}
-                  >
-                    <BookOpen className="w-5 h-5" />
-                    {sidebarOpen && <span>SANS {doc}</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Project Steps */}
-            <div>
-              <div className={`text-sm font-medium mb-3 ${sidebarOpen ? 'block' : 'hidden'}`}>
-                Project Steps
-              </div>
-              <div className="space-y-2">
-                {[
-                  "Project Setup",
-                  "Occupancy Classification",
-                  "Facility Overview",
-                  "Commodity Classification",
-                  "Fire Protection Systems",
-                  "Escape Routes & Signage",
-                  "Special Risks & Mitigation",
-                  "Final Summary"
-                ].map((stepName, index) => (
-                  <button
-                    key={index}
-                    className={`w-full flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200 ${
-                      step === index + 1 ? 'bg-fire/10 text-fire shadow-lg' : ''
-                    }`}
-                    onClick={() => setStep(index + 1)}
-                  >
-                    <div className={`w-6 h-6 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-200 ${
-                      step >= index + 1 ? 'bg-fire text-white' : 'bg-secondary group-hover:bg-secondary/80'
-                    }`}>
-                      {index + 1}
-                    </div>
-                    {sidebarOpen && <span className="truncate">{stepName}</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Links */}
-          <div className="pt-6 space-y-2">
-            <button className="w-full flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200">
-              <Settings className="w-5 h-5" />
-              {sidebarOpen && <span>Settings</span>}
-            </button>
-            <button className="w-full flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200">
-              <HelpCircle className="w-5 h-5" />
-              {sidebarOpen && <span>Help</span>}
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-16'}`}>
-        {/* Header */}
-        <header className="bg-background/80 backdrop-blur-sm border-b border-border sticky top-0 z-10 shadow-lg">
-          <div className="container mx-auto px-6 h-20 flex items-center justify-between">
-            <button 
-              className="btn-primary flex items-center space-x-2 px-5 py-2.5 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200"
-              onClick={() => navigate('/dashboard')}
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Project</span>
-            </button>
-            <button 
-              className="btn-secondary flex items-center space-x-2 px-5 py-2.5 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200"
-              onClick={handleSaveDraft}
-            >
-              <FileText className="w-4 h-4" />
-              <span>Save Draft</span>
-            </button>
-          </div>
-        </header>
-
-        {/* Wizard Content */}
-        <div className="container mx-auto px-6 py-10">
-          <div className="glass-card p-10 rounded-3xl max-w-4xl mx-auto shadow-2xl bg-white/50 backdrop-blur-sm">
-            {/* Step Indicators */}
-            <div className="relative mb-12">
-              {/* Progress Bar */}
-              <div className="absolute top-1/2 left-0 w-full h-1 bg-secondary transform -translate-y-1/2">
-                <div 
-                  className="h-full bg-fire transition-all duration-300 rounded-full"
-                  style={{ width: `${((step - 1) / (totalSteps - 1)) * 100}%` }}
-                />
-              </div>
-
-              {/* Step Buttons */}
-              <div className="relative flex justify-between">
-                {Array.from({ length: totalSteps }, (_, i) => (
-                  <button
-                    key={i}
-                    className="group flex flex-col items-center"
-                    onClick={() => handleStepClick(i + 1)}
-                  >
-                    {/* Step Circle */}
-                    <div 
-                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 mb-2
-                        ${step >= i + 1 
-                          ? 'bg-fire text-white shadow-lg shadow-fire/30' 
-                          : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
-                        }
-                        ${step === i + 1 && 'ring-4 ring-fire/20'}
-                      `}
-                    >
-                      {step > i + 1 ? (
-                        <Check className="w-6 h-6" />
-                      ) : (
-                        <span className="text-lg font-medium">{i + 1}</span>
-                      )}
-                    </div>
-
-                    {/* Step Label */}
-                    <span 
-                      className={`absolute top-16 text-sm font-medium transition-all duration-300 whitespace-nowrap transform -translate-x-1/2 opacity-0 group-hover:opacity-100
-                        ${step === i + 1 ? 'text-fire opacity-100' : 'text-muted-foreground'}
-                      `}
-                    >
-                      {[
-                        "Project Setup",
-                        "Occupancy Classification",
-                        "Facility Overview",
-                        "Commodity Classification",
-                        "Fire Protection Systems",
-                        "Escape Routes & Signage",
-                        "Special Risks & Mitigation",
-                        "Final Summary"
-                      ][i]}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Step Content */}
-            <div className="space-y-8">
-              {step === 1 && (
+                
+                <div className="space-y-2">
+              <Label htmlFor="company_name">Company Name</Label>
+              <Input
+                id="company_name"
+                value={formData.company_name}
+                onChange={(e) => handleInputChange('company_name', e.target.value)}
+                placeholder="Enter company name"
+              />
+                </div>
+                
+                  <div className="space-y-2">
+              <Label htmlFor="client_name">Client Name</Label>
+              <Input
+                id="client_name"
+                value={formData.client_name}
+                onChange={(e) => handleInputChange('client_name', e.target.value)}
+                placeholder="Enter client name"
+              />
+                  </div>
+                  
+                  <div className="space-y-2">
+              <Label htmlFor="facility_process">Facility Process</Label>
+                    <select 
+                id="facility_process"
+                name="facility_process"
+                value={formData.facility_process}
+                onChange={(e) => handleInputChange('facility_process', e.target.value)}
+                className={inputStyles}
+              >
+                <option value="">Select process</option>
+                <option value="manufacturing">Manufacturing</option>
+                <option value="warehousing">Warehousing</option>
+                <option value="distribution">Distribution</option>
+                <option value="office">Office</option>
+                <option value="retail">Retail</option>
+                      <option value="other">Other</option>
+                    </select>
+                </div>
+                
+                <div className="space-y-2">
+              <Label>Facility Location</Label>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold mb-6">Project Setup</h2>
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Project Name</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={projectData.name}
-                        onChange={handleInputChange}
-                        className={inputStyles}
-                        placeholder="Enter project name"
-                      />
+                  <Label htmlFor="facility_location.town">Town</Label>
+                  <select
+                    id="facility_location.town"
+                    value={formData.facility_location.town}
+                    onChange={(e) => handleInputChange('facility_location.town', e.target.value)}
+                    className={inputStyles}
+                  >
+                    <option value="">Select town</option>
+                    <option value="johannesburg">Johannesburg</option>
+                    <option value="pretoria">Pretoria</option>
+                    <option value="cape_town">Cape Town</option>
+                    <option value="durban">Durban</option>
+                    <option value="port_elizabeth">Port Elizabeth</option>
+                    <option value="bloemfontein">Bloemfontein</option>
+                    <option value="kimberley">Kimberley</option>
+                    <option value="nelspruit">Nelspruit</option>
+                    <option value="polokwane">Polokwane</option>
+                    <option value="mbombela">Mbombela</option>
+                    <option value="bisho">Bisho</option>
+                    <option value="kimberley">Kimberley</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="facility_location.province">Province</Label>
+                  <select
+                    id="facility_location.province"
+                    value={formData.facility_location.province}
+                    onChange={(e) => handleInputChange('facility_location.province', e.target.value)}
+                    className={inputStyles}
+                  >
+                    <option value="">Select province</option>
+                    <option value="gauteng">Gauteng</option>
+                    <option value="western_cape">Western Cape</option>
+                    <option value="kwazulu_natal">KwaZulu-Natal</option>
+                    <option value="eastern_cape">Eastern Cape</option>
+                    <option value="limpopo">Limpopo</option>
+                    <option value="mpumalanga">Mpumalanga</option>
+                    <option value="north_west">North West</option>
+                    <option value="free_state">Free State</option>
+                    <option value="northern_cape">Northern Cape</option>
+                  </select>
+              </div>
+            </div>
+            </div>
+
+                <div className="space-y-2">
+              <Label htmlFor="construction_year">Construction Year</Label>
+                    <select 
+                id="construction_year"
+                value={formData.construction_year}
+                onChange={(e) => handleInputChange('construction_year', parseInt(e.target.value))}
+                className={inputStyles}
+              >
+                <option value="">Select year</option>
+                {Array.from({ length: 2024 - 1900 + 1 }, (_, i) => (
+                  <option key={i} value={2024 - i}>
+                    {2024 - i}
+                  </option>
+                ))}
+                    </select>
+                  </div>
+                </div>
+        );
+      case 2:
+        return (
+              <div className="space-y-6">
+                  <div className="space-y-2">
+              <Label htmlFor="buildings">Buildings</Label>
+              {formData.buildings.map((building, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleBuilding(index)}
+                    >
+                      <span className="font-medium">{building.name || `Building ${index + 1}`}</span>
+                      {expandedBuildings.includes(index) ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => handleArrayRemove('buildings', index)}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  {expandedBuildings.includes(index) && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`buildings.${index}.name`}>Building Name</Label>
+                        <Input
+                          type="text"
+                          id={`buildings.${index}.name`}
+                          name={`buildings.${index}.name`}
+                          value={building.name}
+                          onChange={(e) => handleArrayChange('buildings', index, { ...building, name: e.target.value })}
+                          className={inputStyles}
+                          placeholder="Enter building name"
+                    />
+                  </div>
+                      <div>
+                        <Label htmlFor={`buildings.${index}.classification`}>Classification</Label>
+                        <select 
+                          value={building.classification}
+                          onChange={(e) => handleArrayChange('buildings', index, { ...building, classification: e.target.value })}
+                          className={inputStyles}
+                        >
+                          <option value="">Select classification</option>
+                          <option value="A1">A1 – Entertainment and public assembly</option>
+                          <option value="A2">A2 – Theatrical and indoor sport</option>
+                          <option value="A3">A3 – Places of instruction</option>
+                          <option value="A4">A4 – Worship</option>
+                          <option value="A5">A5 – Outdoor sport</option>
+                          <option value="B1">B1 – High risk commercial service</option>
+                          <option value="B2">B2 – Moderate risk commercial service</option>
+                          <option value="B3">B3 – Low risk commercial service</option>
+                          <option value="C1">C1 – Exhibition hall</option>
+                          <option value="C2">C2 – Museum</option>
+                          <option value="D1">D1 – High risk industrial</option>
+                          <option value="D2">D2 – Moderate risk industrial</option>
+                          <option value="D3">D3 – Low risk industrial</option>
+                          <option value="D4">D4 – Plant room</option>
+                          <option value="E1">E1 – Place of detention</option>
+                          <option value="E2">E2 – Hospital</option>
+                          <option value="E3">E3 – Other institutional (residential)</option>
+                          <option value="E4">E4 – Health care</option>
+                          <option value="F1">F1 – Large shop</option>
+                          <option value="F2">F2 – Small shop</option>
+                          <option value="F3">F3 – Wholesalers' store</option>
+                          <option value="G1">G1 – Offices</option>
+                          <option value="H1">H1 – Hotel</option>
+                          <option value="H2">H2 – Dormitory</option>
+                          <option value="H3">H3 – Domestic residence</option>
+                          <option value="H4">H4 – Dwelling house</option>
+                          <option value="H5">H5 – Hospitality</option>
+                          <option value="J1">J1 – High risk storage</option>
+                          <option value="J2">J2 – Moderate risk storage</option>
+                          <option value="J3">J3 – Low risk storage</option>
+                          <option value="J4">J4 – Parking garage</option>
+                        </select>
+                </div>
+                      <div>
+                        <Label htmlFor={`buildings.${index}.construction_materials`}>Construction Materials</Label>
+                <div className="space-y-2">
+                          {Object.entries({
+                            brick: "Brick",
+                            steel: "Steel",
+                            concrete: "Concrete",
+                            timber: "Timber"
+                          }).map(([key, label]) => (
+                            <label key={key} className={checkboxWrapperStyles}>
+                  <input
+                        type="checkbox"
+                                checked={building.construction_materials[key]}
+                                onChange={(e) => handleArrayChange('buildings', index, {
+                                  ...building,
+                                  construction_materials: {
+                                    ...building.construction_materials,
+                                    [key]: e.target.checked
+                                  }
+                                })}
+                                className={checkboxStyles}
+                              />
+                              <span className="text-sm font-medium group-hover:text-fire transition-colors duration-200">
+                                {label}
+                              </span>
+                      </label>
+                          ))}
+                          <Input
+                            type="text"
+                            value={building.construction_materials.other}
+                            onChange={(e) => handleArrayChange('buildings', index, {
+                              ...building,
+                              construction_materials: {
+                                ...building.construction_materials,
+                                other: e.target.value
+                              }
+                            })}
+                            className={inputStyles}
+                            placeholder="Other materials"
+                          />
+                        </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Client Name</label>
-                      <input
-                        type="text"
-                        name="client_name"
-                        value={projectData.client_name}
-                        onChange={handleInputChange}
-                        className={inputStyles}
-                        placeholder="Enter client name"
-                      />
+                    
+                      {/* Aerial View and CAD Drawings Section */}
+                      <div className="space-y-2">
+                        <Label>Aerial View & CAD Drawings</Label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor={`buildings.${index}.aerial_view`}>Aerial View (Google Maps)</Label>
+                            <div className="flex items-center space-x-4">
+                              {building.aerial_view ? (
+                                <div className="relative">
+                                  <img
+                                    src={building.aerial_view}
+                                    alt="Aerial View"
+                                    className="w-32 h-32 object-cover rounded-2xl"
+                                  />
+                                  <button
+                                    onClick={() => handleArrayChange('buildings', index, { ...building, aerial_view: '' })}
+                                    className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Facility Address</label>
-                      <textarea
-                        name="facility_address"
-                        value={projectData.facility_address}
-                        onChange={handleInputChange}
-                        className={inputStyles}
-                        placeholder="Enter facility address"
-                        rows={3}
-                      />
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    // Add file upload logic here
+                                    handleArrayChange('buildings', index, { ...building, aerial_view: 'placeholder.jpg' });
+                                  }}
+                                  className="w-32 h-32 border-2 border-dashed rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-600"
+                                >
+                                  <Upload className="w-8 h-8" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <Label htmlFor={`buildings.${index}.cad_drawing`}>CAD Drawing</Label>
+                            <div className="flex items-center space-x-4">
+                              {building.cad_drawing ? (
+                                <div className="relative">
+                                  <img
+                                    src={building.cad_drawing}
+                                    alt="CAD Drawing"
+                                    className="w-32 h-32 object-cover rounded-2xl"
+                                  />
+                                  <button
+                                    onClick={() => handleArrayChange('buildings', index, { ...building, cad_drawing: '' })}
+                                    className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Occupancy Certificate Status</label>
-                      <select
-                        name="occupancy_certificate_status"
-                        value={projectData.occupancy_certificate_status}
-                        onChange={handleInputChange}
-                        className={inputStyles}
-                      >
-                        <option value="">Select status</option>
-                        <option value="valid">Valid</option>
-                        <option value="expired">Expired</option>
-                        <option value="pending">Pending</option>
-                      </select>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    // Add file upload logic here
+                                    handleArrayChange('buildings', index, { ...building, cad_drawing: 'placeholder.jpg' });
+                                  }}
+                                  className="w-32 h-32 border-2 border-dashed rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-600"
+                                >
+                                  <Upload className="w-8 h-8" />
+                                </button>
+                              )}
+                  </div>
+                </div>
+              </div>
+            </div>
+                      <div>
+                        <Label htmlFor={`buildings.${index}.total_floor_area`}>Total Building Area (m²)</Label>
+                        <Input
+                          type="number"
+                          value={building.total_floor_area}
+                          onChange={(e) => handleArrayChange('buildings', index, { ...building, total_floor_area: parseFloat(e.target.value) })}
+                          className={inputStyles}
+                          placeholder="Enter total building area"
+                        />
+                  </div>
+                </div>
+                  )}
+                      </div>
+              ))}
+              <button
+                onClick={() => handleArrayAdd('buildings', {
+                  name: '',
+                  classification: '',
+                  construction_materials: {
+                    brick: false,
+                    steel: false,
+                    concrete: false,
+                    timber: false,
+                    other: ''
+                  },
+                  total_floor_area: 0,
+                  floor_plan: '',
+                  cad_drawing: '',
+                  sans_10400_t_table: '',
+                  fire_load: {
+                    commodities: [],
+                    total_timber_equivalent: 0
+                  },
+                  aerial_view: ''
+                })}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Building</span>
+                      </button>
                     </div>
+                  </div>
+        );
+      case 3:
+        return (
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Project Summary</h3>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Company Name</p>
+                <p className="font-medium">{formData.company_name}</p>
+                </div>
+                <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Client</p>
+                <p className="font-medium">{formData.client_name}</p>
+                </div>
+                <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Facility Process</p>
+                <p className="font-medium">{formData.facility_process}</p>
+              </div>
+                  <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Location</p>
+                <p className="font-medium">{formData.facility_location.town}, {formData.facility_location.province}</p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Construction Year</p>
+                <p className="font-medium">{formData.construction_year}</p>
+              </div>
+                    </div>
+                    
+            {/* Zones Section */}
+            <div className="space-y-2">
+              <Label htmlFor="zones">Zones</Label>
+              {formData.zones.map((zone, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleSection(`zone_${index}`)}
+                    >
+                      <span className="font-medium">{zone.name || `Zone ${index + 1}`}</span>
+                      {expandedSections[`zone_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => handleArrayRemove('zones', index)}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                    </div>
+                    
+                  {expandedSections[`zone_${index}`] && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`zones.${index}.name`}>Zone Name</Label>
+                        <Input
+                          type="text"
+                          id={`zones.${index}.name`}
+                          name={`zones.${index}.name`}
+                          value={zone.name}
+                          onChange={(e) => handleArrayChange('zones', index, { ...zone, name: e.target.value })}
+                          className={inputStyles}
+                          placeholder="Enter zone name"
+                        />
+                    </div>
+                      <div>
+                        <Label htmlFor={`zones.${index}.photos`}>Photos</Label>
+                        <div className="flex flex-wrap gap-4">
+                          {zone.photos.map((photo, photoIndex) => (
+                            <div key={photoIndex} className="relative">
+                              <img src={photo} alt={`Zone ${index + 1} Photo ${photoIndex + 1}`} className="w-32 h-32 object-cover rounded-2xl" />
+                              <button
+                                onClick={() => {
+                                  const newPhotos = zone.photos.filter((_, i) => i !== photoIndex);
+                                  handleArrayChange('zones', index, { ...zone, photos: newPhotos });
+                                }}
+                                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                  </div>
+                          ))}
+                          <button
+                            onClick={() => {
+                              const newPhotos = [...zone.photos, 'placeholder.jpg'];
+                              handleArrayChange('zones', index, { ...zone, photos: newPhotos });
+                            }}
+                            className="w-32 h-32 border-2 border-dashed rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-600"
+                          >
+                            <Upload className="w-8 h-8" />
+                          </button>
+                </div>
+              </div>
+            </div>
+          )}
+                  </div>
+              ))}
+              <button
+                onClick={() => handleArrayAdd('zones', { name: '', photos: [] })}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Zone</span>
+              </button>
+            </div>
+          </div>
+        );
+      case 4:
+        return (
+          <div className="space-y-6">
+            {/* Expected Commodities Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Expected Commodities</h4>
+              {formData.buildings[0]?.fire_load.commodities.map((commodity, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleSection(`commodity_${index}`)}
+                    >
+                      <span className="font-medium">{commodity.name || `Commodity ${index + 1}`}</span>
+                      {expandedSections[`commodity_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newCommodities = formData.buildings[0].fire_load.commodities.filter((_, i) => i !== index);
+                        handleArrayChange('buildings', 0, {
+                          ...formData.buildings[0],
+                          fire_load: {
+                            ...formData.buildings[0].fire_load,
+                            commodities: newCommodities
+                          }
+                        });
+                      }}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                </div>
+                
+                  {expandedSections[`commodity_${index}`] && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`buildings.0.fire_load.commodities.${index}.name`}>Commodity Name</Label>
+                        <Input
+                          type="text"
+                          id={`buildings.0.fire_load.commodities.${index}.name`}
+                          value={commodity.name}
+                          onChange={(e) => {
+                            const newCommodities = [...formData.buildings[0].fire_load.commodities];
+                            newCommodities[index] = { ...commodity, name: e.target.value };
+                            handleArrayChange('buildings', 0, {
+                              ...formData.buildings[0],
+                              fire_load: {
+                                ...formData.buildings[0].fire_load,
+                                commodities: newCommodities
+                              }
+                            });
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter commodity name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`buildings.0.fire_load.commodities.${index}.category`}>Category</Label>
+                        <select
+                          id={`buildings.0.fire_load.commodities.${index}.category`}
+                          value={commodity.category}
+                          onChange={(e) => {
+                            const newCommodities = [...formData.buildings[0].fire_load.commodities];
+                            newCommodities[index] = { ...commodity, category: e.target.value };
+                            handleArrayChange('buildings', 0, {
+                              ...formData.buildings[0],
+                              fire_load: {
+                                ...formData.buildings[0].fire_load,
+                                commodities: newCommodities
+                              }
+                            });
+                          }}
+                          className={inputStyles}
+                        >
+                          <option value="">Select category</option>
+                          <option value="I">Category I - Low Hazard</option>
+                          <option value="II">Category II - Medium Hazard</option>
+                          <option value="III">Category III - High Hazard</option>
+                          <option value="IV">Category IV - Extra High Hazard</option>
+                        </select>
+                    </div>
+                      <div>
+                        <Label htmlFor={`buildings.0.fire_load.commodities.${index}.minimum_stacking_height`}>Stacking Height (m)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          id={`buildings.0.fire_load.commodities.${index}.minimum_stacking_height`}
+                          value={commodity.minimum_stacking_height}
+                          onChange={(e) => {
+                            const newCommodities = [...formData.buildings[0].fire_load.commodities];
+                            newCommodities[index] = { ...commodity, minimum_stacking_height: parseFloat(e.target.value) };
+                            handleArrayChange('buildings', 0, {
+                              ...formData.buildings[0],
+                              fire_load: {
+                                ...formData.buildings[0].fire_load,
+                                commodities: newCommodities
+                              }
+                            });
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter stacking height"
+                        />
+                        {commodity.category && commodity.minimum_stacking_height > 0 && (
+                          <div className="mt-2">
+                            {(() => {
+                              const maxHeights = {
+                                'I': 3.0,
+                                'II': 2.5,
+                                'III': 2.0,
+                                'IV': 1.5
+                              };
+                              const maxHeight = maxHeights[commodity.category as keyof typeof maxHeights];
+                              if (commodity.minimum_stacking_height > maxHeight) {
+                                return (
+                                  <p className="text-sm text-red-500">
+                                    Warning: Stacking height exceeds maximum allowed height of {maxHeight}m for Category {commodity.category}
+                                  </p>
+                                );
+                              }
+                              return null;
+                            })()}
+                      </div>
+                        )}
+                    </div>
+                      <div>
+                        <Label htmlFor={`buildings.0.fire_load.commodities.${index}.storage_type`}>Storage Type</Label>
+                        <select
+                          id={`buildings.0.fire_load.commodities.${index}.storage_type`}
+                          value={commodity.storage_type}
+                          onChange={(e) => {
+                            const newCommodities = [...formData.buildings[0].fire_load.commodities];
+                            newCommodities[index] = { ...commodity, storage_type: e.target.value };
+                            handleArrayChange('buildings', 0, {
+                              ...formData.buildings[0],
+                              fire_load: {
+                                ...formData.buildings[0].fire_load,
+                                commodities: newCommodities
+                              }
+                            });
+                          }}
+                          className={inputStyles}
+                        >
+                          <option value="">Select storage type</option>
+                          <option value="palletized">Palletized</option>
+                          <option value="solid_pile">Solid Pile</option>
+                          <option value="shelf_storage">Shelf Storage</option>
+                          <option value="rack_storage">Rack Storage</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                  </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newCommodities = [...formData.buildings[0].fire_load.commodities, {
+                    name: '',
+                    category: '',
+                    minimum_stacking_height: 0,
+                    storage_type: ''
+                  }];
+                  handleArrayChange('buildings', 0, {
+                    ...formData.buildings[0],
+                    fire_load: {
+                      ...formData.buildings[0].fire_load,
+                      commodities: newCommodities
+                    }
+                  });
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Expected Commodity</span>
+              </button>
+            </div>
+          </div>
+        );
+      case 5:
+        return (
+          <div className="space-y-6">
+            {/* Occupancy Separation Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Occupancy Separation</h4>
+              <div className={cardStyles}>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="occupancy_separation.type">Separation Type</Label>
+                    <select
+                      id="occupancy_separation.type"
+                      value={formData.occupancy_separation.type}
+                      onChange={(e) => handleInputChange('occupancy_separation.type', e.target.value)}
+                      className={inputStyles}
+                    >
+                      <option value="">Select separation type</option>
+                      <option value="fire_rated_wall">Fire Rated Wall</option>
+                      <option value="fire_rated_door">Fire Rated Door</option>
+                      <option value="fire_rated_floor">Fire Rated Floor</option>
+                      <option value="fire_rated_ceiling">Fire Rated Ceiling</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="occupancy_separation.rating">Fire Rating (hours)</Label>
+                    <Input
+                      type="number"
+                      id="occupancy_separation.rating"
+                      value={formData.occupancy_separation.rating}
+                      onChange={(e) => handleInputChange('occupancy_separation.rating', parseFloat(e.target.value))}
+                      className={inputStyles}
+                      placeholder="Enter fire rating"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Divisional Separation Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Divisional Separation</h4>
+              <div className={cardStyles}>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <Label htmlFor="divisional_separation.fire_rated_walls">Fire Rated Walls</Label>
                       <label className={checkboxWrapperStyles}>
                         <input
                           type="checkbox"
-                          name="pre_1985_building"
-                          checked={projectData.pre_1985_building}
-                          onChange={handleInputChange}
+                          id="divisional_separation.fire_rated_walls"
+                          checked={formData.divisional_separation.fire_rated_walls}
+                          onChange={(e) => handleInputChange('divisional_separation.fire_rated_walls', e.target.checked)}
                           className={checkboxStyles}
                         />
                         <span className="text-sm font-medium group-hover:text-fire transition-colors duration-200">
-                          This building was constructed before 1985
+                          Fire Rated Walls Present
+                        </span>
+                      </label>
+                    </div>
+                    <div>
+                      <Label htmlFor="divisional_separation.fire_rated_doors">Fire Rated Doors</Label>
+                      <label className={checkboxWrapperStyles}>
+                        <input
+                          type="checkbox"
+                          id="divisional_separation.fire_rated_doors"
+                          checked={formData.divisional_separation.fire_rated_doors}
+                          onChange={(e) => handleInputChange('divisional_separation.fire_rated_doors', e.target.checked)}
+                          className={checkboxStyles}
+                        />
+                        <span className="text-sm font-medium group-hover:text-fire transition-colors duration-200">
+                          Fire Rated Doors Present
                         </span>
                       </label>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
+            </div>
 
-              {step === 2 && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Occupancy Classification</h2>
-                  <div className="space-y-6">
-                    {projectData.buildings.map((building, index) => (
-                      <div key={index} className="border rounded-lg p-4">
-                        <button
-                          className="w-full flex items-center justify-between mb-4"
-                          onClick={() => toggleBuilding(index)}
-                        >
-                          <span className="font-medium">{building.name || `Building ${index + 1}`}</span>
-                          {expandedBuildings.includes(index) ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                        </button>
-                        
-                        {expandedBuildings.includes(index) && (
-                          <div className="space-y-4">
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Building Name</label>
-                              <input
-                                type="text"
-                                value={building.name}
-                                onChange={(e) => handleArrayChange('buildings', index, { ...building, name: e.target.value })}
-                                className="w-full p-2 border rounded"
-                                placeholder="Enter building name"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Classification</label>
-                              <select
-                                value={building.classification}
-                                onChange={(e) => handleArrayChange('buildings', index, { ...building, classification: e.target.value })}
-                                className="w-full p-2 border rounded"
-                              >
-                                <option value="">Select classification</option>
-                                {["A1", "A2", "A3", "A4", "B1", "B2", "B3", "C1", "C2", "D1", "D2", "D3", "D4", "E1", "E2", "E3", "E4", "F1", "F2", "F3", "G1", "H1", "H2", "H3", "H4", "J1", "J2", "J3", "J4"].map(cls => (
-                                  <option key={cls} value={cls}>{cls}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Construction Materials</label>
-                              <div className="space-y-2">
-                                {Object.entries({
-                                  brick: "Brick",
-                                  steel: "Steel",
-                                  concrete: "Concrete",
-                                  timber: "Timber"
-                                }).map(([key, label]) => (
-                                  <label key={key} className="flex items-center">
-                                    <input
-                                      type="checkbox"
-                                      checked={building.construction_materials[key]}
-                                      onChange={(e) => handleArrayChange('buildings', index, {
-                                        ...building,
-                                        construction_materials: {
-                                          ...building.construction_materials,
-                                          [key]: e.target.checked
-                                        }
-                                      })}
-                                      className="mr-2"
-                                    />
-                                    {label}
-                                  </label>
-                                ))}
-                                <input
-                                  type="text"
-                                  value={building.construction_materials.other}
-                                  onChange={(e) => handleArrayChange('buildings', index, {
-                                    ...building,
-                                    construction_materials: {
-                                      ...building.construction_materials,
-                                      other: e.target.value
-                                    }
-                                  })}
-                                  className="w-full p-2 border rounded mt-2"
-                                  placeholder="Other materials"
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Total Floor Area (m²)</label>
-                              <input
-                                type="number"
-                                value={building.total_floor_area}
-                                onChange={(e) => handleArrayChange('buildings', index, { ...building, total_floor_area: parseFloat(e.target.value) })}
-                                className="w-full p-2 border rounded"
-                                placeholder="Enter total floor area"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Fire Load Calculation</label>
-                              <div className="space-y-4">
-                                {building.fire_load.commodities.map((commodity, commodityIndex) => (
-                                  <div key={commodityIndex} className="flex items-center space-x-4">
-                                    <input
-                                      type="text"
-                                      value={commodity.name}
-                                      onChange={(e) => {
-                                        const newCommodities = [...building.fire_load.commodities];
-                                        newCommodities[commodityIndex] = { ...commodity, name: e.target.value };
-                                        handleArrayChange('buildings', index, {
-                                          ...building,
-                                          fire_load: { ...building.fire_load, commodities: newCommodities }
-                                        });
-                                      }}
-                                      className="flex-1 p-2 border rounded"
-                                      placeholder="Commodity name"
-                                    />
-                                    <input
-                                      type="number"
-                                      value={commodity.quantity}
-                                      onChange={(e) => {
-                                        const newCommodities = [...building.fire_load.commodities];
-                                        newCommodities[commodityIndex] = { ...commodity, quantity: parseFloat(e.target.value) };
-                                        handleArrayChange('buildings', index, {
-                                          ...building,
-                                          fire_load: { ...building.fire_load, commodities: newCommodities }
-                                        });
-                                      }}
-                                      className="w-32 p-2 border rounded"
-                                      placeholder="Quantity"
-                                    />
-                                    <input
-                                      type="number"
-                                      value={commodity.calorific_value}
-                                      onChange={(e) => {
-                                        const newCommodities = [...building.fire_load.commodities];
-                                        newCommodities[commodityIndex] = { ...commodity, calorific_value: parseFloat(e.target.value) };
-                                        handleArrayChange('buildings', index, {
-                                          ...building,
-                                          fire_load: { ...building.fire_load, commodities: newCommodities }
-                                        });
-                                      }}
-                                      className="w-32 p-2 border rounded"
-                                      placeholder="Calorific value"
-                                    />
-                                    <button
-                                      onClick={() => {
-                                        const newCommodities = building.fire_load.commodities.filter((_, i) => i !== commodityIndex);
-                                        handleArrayChange('buildings', index, {
-                                          ...building,
-                                          fire_load: { ...building.fire_load, commodities: newCommodities }
-                                        });
-                                      }}
-                                      className="p-2 text-red-500 hover:text-red-700"
-                                    >
-                                      <X className="w-5 h-5" />
-                                    </button>
-                                  </div>
-                                ))}
-                                <button
-                                  onClick={() => {
-                                    const newCommodities = [...building.fire_load.commodities, { name: '', quantity: 0, calorific_value: 0, timber_equivalent: 0 }];
-                                    handleArrayChange('buildings', index, {
-                                      ...building,
-                                      fire_load: { ...building.fire_load, commodities: newCommodities }
-                                    });
-                                  }}
-                                  className="btn-secondary flex items-center space-x-2"
-                                >
-                                  <Plus className="w-4 h-4" />
-                                  <span>Add Commodity</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    <button
-                      onClick={() => handleArrayAdd('buildings', {
-                        name: '',
-                        classification: '',
-                        construction_materials: {
-                          brick: false,
-                          steel: false,
-                          concrete: false,
-                          timber: false,
-                          other: ''
-                        },
-                        total_floor_area: 0,
-                        sans_10400_t_table: '',
-                        fire_load: {
-                          commodities: []
-                        }
-                      })}
-                      className="btn-secondary flex items-center space-x-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Add Building</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {step === 3 && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Facility Overview</h2>
-                  <div className="space-y-6">
-                    {/* Zones */}
-                    <div>
-                      <h3 className="text-xl font-semibold mb-4">Zones</h3>
-                      {projectData.zones.map((zone, index) => (
-                        <div key={index} className="border rounded-lg p-4 mb-4">
-                          <div className="space-y-4">
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Zone Name</label>
-                              <input
-                                type="text"
-                                value={zone.name}
-                                onChange={(e) => handleArrayChange('zones', index, { ...zone, name: e.target.value })}
-                                className="w-full p-2 border rounded"
-                                placeholder="Enter zone name"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Photos</label>
-                              <div className="flex flex-wrap gap-4">
-                                {zone.photos.map((photo, photoIndex) => (
-                                  <div key={photoIndex} className="relative">
-                                    <img src={photo} alt={`Zone ${index + 1} Photo ${photoIndex + 1}`} className="w-32 h-32 object-cover rounded" />
-                                    <button
-                                      onClick={() => {
-                                        const newPhotos = zone.photos.filter((_, i) => i !== photoIndex);
-                                        handleArrayChange('zones', index, { ...zone, photos: newPhotos });
-                                      }}
-                                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                ))}
-                                <button
-                                  onClick={() => {
-                                    // Add photo upload logic here
-                                    const newPhotos = [...zone.photos, 'placeholder.jpg'];
-                                    handleArrayChange('zones', index, { ...zone, photos: newPhotos });
-                                  }}
-                                  className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                                >
-                                  <Camera className="w-8 h-8" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+            {/* Automatic Fire Extinguishment Section - Only shown when no divisional separation */}
+            {!formData.divisional_separation.fire_rated_walls && !formData.divisional_separation.fire_rated_doors && (
+              <div className="space-y-4">
+                <h4 className="font-medium">Automatic Fire Extinguishment</h4>
+                {formData.automatic_fire_extinguishment.areas.map((area, index) => (
+                  <div key={index} className={cardStyles}>
+                    <div className="flex items-center justify-between mb-4">
                       <button
-                        onClick={() => handleArrayAdd('zones', { name: '', photos: [] })}
-                        className="btn-secondary flex items-center space-x-2"
+                        className="flex items-center justify-between flex-grow"
+                        onClick={() => toggleSection(`fire_extinguishment_${index}`)}
                       >
-                        <Plus className="w-4 h-4" />
-                        <span>Add Zone</span>
+                        <span className="font-medium">{area.name || `Area ${index + 1}`}</span>
+                        {expandedSections[`fire_extinguishment_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const newAreas = formData.automatic_fire_extinguishment.areas.filter((_, i) => i !== index);
+                          handleInputChange('automatic_fire_extinguishment.areas', newAreas);
+                        }}
+                        className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                      >
+                        <X className="w-5 h-5" />
                       </button>
                     </div>
-
-                    {/* Special Risks */}
-                    <div>
-                      <h3 className="text-xl font-semibold mb-4">Special Risks</h3>
-                      <div className="space-y-6">
-                        {/* Diesel Tank */}
-                        <div className="border rounded-lg p-4">
-                          <h4 className="text-lg font-medium mb-4">Diesel Tank</h4>
-                          <div className="space-y-4">
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Location</label>
-                              <input
-                                type="text"
-                                value={projectData.special_risks.diesel_tank.location}
-                                onChange={(e) => setProjectData(prev => ({
-                                  ...prev,
-                                  special_risks: {
-                                    ...prev.special_risks,
-                                    diesel_tank: {
-                                      ...prev.special_risks.diesel_tank,
-                                      location: e.target.value
-                                    }
-                                  }
-                                }))}
-                                className="w-full p-2 border rounded"
-                                placeholder="Enter diesel tank location"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Photo</label>
-                              <div className="flex items-center space-x-4">
-                                {projectData.special_risks.diesel_tank.photo && (
-                                  <div className="relative">
-                                    <img
-                                      src={projectData.special_risks.diesel_tank.photo}
-                                      alt="Diesel Tank"
-                                      className="w-32 h-32 object-cover rounded"
-                                    />
-                                    <button
-                                      onClick={() => setProjectData(prev => ({
-                                        ...prev,
-                                        special_risks: {
-                                          ...prev.special_risks,
-                                          diesel_tank: {
-                                            ...prev.special_risks.diesel_tank,
-                                            photo: ''
-                                          }
-                                        }
-                                      }))}
-                                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                )}
-                                {!projectData.special_risks.diesel_tank.photo && (
-                                  <button
-                                    onClick={() => {
-                                      // Add photo upload logic here
-                                      setProjectData(prev => ({
-                                        ...prev,
-                                        special_risks: {
-                                          ...prev.special_risks,
-                                          diesel_tank: {
-                                            ...prev.special_risks.diesel_tank,
-                                            photo: 'placeholder.jpg'
-                                          }
-                                        }
-                                      }));
-                                    }}
-                                    className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                                  >
-                                    <Camera className="w-8 h-8" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                    
+                    {expandedSections[`fire_extinguishment_${index}`] && (
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.name`}>Area Name</Label>
+                          <Input
+                            type="text"
+                            id={`automatic_fire_extinguishment.areas.${index}.name`}
+                            value={area.name}
+                            onChange={(e) => {
+                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
+                              newAreas[index] = { ...area, name: e.target.value };
+                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
+                            }}
+                            className={inputStyles}
+                            placeholder="Enter area name"
+                          />
                         </div>
-
-                        {/* Inverter Canopy */}
-                        <div className="border rounded-lg p-4">
-                          <h4 className="text-lg font-medium mb-4">Inverter Canopy</h4>
-                          <div className="space-y-4">
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Details</label>
-                              <textarea
-                                value={projectData.special_risks.inverter_canopy.details}
-                                onChange={(e) => setProjectData(prev => ({
-                                  ...prev,
-                                  special_risks: {
-                                    ...prev.special_risks,
-                                    inverter_canopy: {
-                                      ...prev.special_risks.inverter_canopy,
-                                      details: e.target.value
-                                    }
-                                  }
-                                }))}
-                                className="w-full p-2 border rounded"
-                                placeholder="Enter inverter canopy details"
-                                rows={3}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Photo</label>
-                              <div className="flex items-center space-x-4">
-                                {projectData.special_risks.inverter_canopy.photo && (
-                                  <div className="relative">
-                                    <img
-                                      src={projectData.special_risks.inverter_canopy.photo}
-                                      alt="Inverter Canopy"
-                                      className="w-32 h-32 object-cover rounded"
-                                    />
-                                    <button
-                                      onClick={() => setProjectData(prev => ({
-                                        ...prev,
-                                        special_risks: {
-                                          ...prev.special_risks,
-                                          inverter_canopy: {
-                                            ...prev.special_risks.inverter_canopy,
-                                            photo: ''
-                                          }
-                                        }
-                                      }))}
-                                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                )}
-                                {!projectData.special_risks.inverter_canopy.photo && (
-                                  <button
-                                    onClick={() => {
-                                      // Add photo upload logic here
-                                      setProjectData(prev => ({
-                                        ...prev,
-                                        special_risks: {
-                                          ...prev.special_risks,
-                                          inverter_canopy: {
-                                            ...prev.special_risks.inverter_canopy,
-                                            photo: 'placeholder.jpg'
-                                          }
-                                        }
-                                      }));
-                                    }}
-                                    className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                                  >
-                                    <Camera className="w-8 h-8" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                        <div>
+                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.commodity`}>Commodity</Label>
+                          <Input
+                            type="text"
+                            id={`automatic_fire_extinguishment.areas.${index}.commodity`}
+                            value={area.commodity}
+                            onChange={(e) => {
+                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
+                              newAreas[index] = { ...area, commodity: e.target.value };
+                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
+                            }}
+                            className={inputStyles}
+                            placeholder="Enter commodity type"
+                          />
                         </div>
-
-                        {/* Pallet Storage */}
-                        <div className="border rounded-lg p-4">
-                          <h4 className="text-lg font-medium mb-4">Pallet Storage</h4>
-                          <div className="space-y-4">
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Location</label>
-                              <input
-                                type="text"
-                                value={projectData.special_risks.pallet_storage.location}
-                                onChange={(e) => setProjectData(prev => ({
-                                  ...prev,
-                                  special_risks: {
-                                    ...prev.special_risks,
-                                    pallet_storage: {
-                                      ...prev.special_risks.pallet_storage,
-                                      location: e.target.value
-                                    }
-                                  }
-                                }))}
-                                className="w-full p-2 border rounded"
-                                placeholder="Enter pallet storage location"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Photo</label>
-                              <div className="flex items-center space-x-4">
-                                {projectData.special_risks.pallet_storage.photo && (
-                                  <div className="relative">
-                                    <img
-                                      src={projectData.special_risks.pallet_storage.photo}
-                                      alt="Pallet Storage"
-                                      className="w-32 h-32 object-cover rounded"
-                                    />
-                                    <button
-                                      onClick={() => setProjectData(prev => ({
-                                        ...prev,
-                                        special_risks: {
-                                          ...prev.special_risks,
-                                          pallet_storage: {
-                                            ...prev.special_risks.pallet_storage,
-                                            photo: ''
-                                          }
-                                        }
-                                      }))}
-                                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                )}
-                                {!projectData.special_risks.pallet_storage.photo && (
-                                  <button
-                                    onClick={() => {
-                                      // Add photo upload logic here
-                                      setProjectData(prev => ({
-                                        ...prev,
-                                        special_risks: {
-                                          ...prev.special_risks,
-                                          pallet_storage: {
-                                            ...prev.special_risks.pallet_storage,
-                                            photo: 'placeholder.jpg'
-                                          }
-                                        }
-                                      }));
-                                    }}
-                                    className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                                  >
-                                    <Camera className="w-8 h-8" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {step === 4 && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Commodity Classification</h2>
-                  <div className="space-y-6">
-                    {projectData.storage_details.map((storage, index) => (
-                      <div key={index} className="border rounded-lg p-4">
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Commodity Type</label>
-                            <input
-                              type="text"
-                              value={storage.commodity_type}
-                              onChange={(e) => handleArrayChange('storage_details', index, { ...storage, commodity_type: e.target.value })}
-                              className="w-full p-2 border rounded"
-                              placeholder="Enter commodity type"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Category</label>
-                            <select
-                              value={storage.category}
-                              onChange={(e) => handleArrayChange('storage_details', index, { ...storage, category: e.target.value as 'I' | 'II' | 'III' | 'IV' })}
-                              className="w-full p-2 border rounded"
-                            >
-                              <option value="">Select category</option>
-                              <option value="I">Category I</option>
-                              <option value="II">Category II</option>
-                              <option value="III">Category III</option>
-                              <option value="IV">Category IV</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Stack Height (m)</label>
-                            <input
-                              type="number"
-                              value={storage.stack_height}
-                              onChange={(e) => handleArrayChange('storage_details', index, { ...storage, stack_height: parseFloat(e.target.value) })}
-                              className="w-full p-2 border rounded"
-                              placeholder="Enter stack height"
-                            />
-                          </div>
-                          <button
-                            onClick={() => handleArrayRemove('storage_details', index)}
-                            className="text-red-500 hover:text-red-700"
+                        <div>
+                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.category`}>Category</Label>
+                          <select
+                            id={`automatic_fire_extinguishment.areas.${index}.category`}
+                            value={area.category}
+                            onChange={(e) => {
+                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
+                              newAreas[index] = { ...area, category: e.target.value };
+                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
+                            }}
+                            className={inputStyles}
                           >
-                            <X className="w-5 h-5" />
-                          </button>
+                            <option value="">Select category</option>
+                            <option value="I">Category I - Low Hazard</option>
+                            <option value="II">Category II - Medium Hazard</option>
+                            <option value="III">Category III - High Hazard</option>
+                            <option value="IV">Category IV - Extra High Hazard</option>
+                          </select>
+                        </div>
+                        <div>
+                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.storage_type`}>Storage Type</Label>
+                          <select
+                            id={`automatic_fire_extinguishment.areas.${index}.storage_type`}
+                            value={area.storage_type}
+                            onChange={(e) => {
+                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
+                              newAreas[index] = { ...area, storage_type: e.target.value };
+                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
+                            }}
+                            className={inputStyles}
+                          >
+                            <option value="">Select storage type</option>
+                            <option value="palletized">Palletized</option>
+                            <option value="solid_pile">Solid Pile</option>
+                            <option value="shelf_storage">Shelf Storage</option>
+                            <option value="rack_storage">Rack Storage</option>
+                          </select>
+                        </div>
+                        <div>
+                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.max_stacking_height`}>Maximum Stacking Height (m)</Label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            id={`automatic_fire_extinguishment.areas.${index}.max_stacking_height`}
+                            value={area.max_stacking_height}
+                            onChange={(e) => {
+                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
+                              newAreas[index] = { ...area, max_stacking_height: parseFloat(e.target.value) };
+                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
+                            }}
+                            className={inputStyles}
+                            placeholder="Enter maximum stacking height"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.current_stacking_height`}>Current Stacking Height (m)</Label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            id={`automatic_fire_extinguishment.areas.${index}.current_stacking_height`}
+                            value={area.current_stacking_height}
+                            onChange={(e) => {
+                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
+                              newAreas[index] = { ...area, current_stacking_height: parseFloat(e.target.value) };
+                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
+                            }}
+                            className={inputStyles}
+                            placeholder="Enter current stacking height"
+                          />
                         </div>
                       </div>
-                    ))}
+                    )}
+                  </div>
+                ))}
+                <button
+                  onClick={() => {
+                    const newAreas = [...formData.automatic_fire_extinguishment.areas, {
+                      name: '',
+                      commodity: '',
+                      category: '',
+                      storage_type: '',
+                      max_stacking_height: 0,
+                      current_stacking_height: 0
+                    }];
+                    handleInputChange('automatic_fire_extinguishment.areas', newAreas);
+                  }}
+                  className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Fire Extinguishment Area</span>
+                </button>
+              </div>
+            )}
+
+            {/* Escape Routes Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Escape Routes</h4>
+              {formData.escape_routes.routes.map((route, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
                     <button
-                      onClick={() => handleArrayAdd('storage_details', {
-                        commodity_type: '',
-                        category: '',
-                        stack_height: 0
-                      })}
-                      className="btn-secondary flex items-center space-x-2"
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleSection(`escape_route_${index}`)}
                     >
-                      <Plus className="w-4 h-4" />
-                      <span>Add Storage Detail</span>
+                      <span className="font-medium">{route.name || `Route ${index + 1}`}</span>
+                      {expandedSections[`escape_route_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newRoutes = formData.escape_routes.routes.filter((_, i) => i !== index);
+                        handleInputChange('escape_routes.routes', newRoutes);
+                      }}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
-                </div>
-              )}
-
-              {step === 5 && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Fire Protection Systems</h2>
-                  <div className="space-y-6">
-                    {/* Divisional Separation */}
-                    <div className="border rounded-lg p-4">
-                      <h3 className="text-xl font-semibold mb-4">Divisional Separation</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={projectData.divisional_separation.fire_rated_walls}
-                              onChange={(e) => setProjectData(prev => ({
-                                ...prev,
-                                divisional_separation: {
-                                  ...prev.divisional_separation,
-                                  fire_rated_walls: e.target.checked
-                                }
-                              }))}
-                              className="mr-2"
-                            />
-                            Fire Rated Walls
-                          </label>
-                        </div>
-                        <div>
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={projectData.divisional_separation.fire_rated_doors}
-                              onChange={(e) => setProjectData(prev => ({
-                                ...prev,
-                                divisional_separation: {
-                                  ...prev.divisional_separation,
-                                  fire_rated_doors: e.target.checked
-                                }
-                              }))}
-                              className="mr-2"
-                            />
-                            Fire Rated Doors
-                          </label>
-                        </div>
-                        <div>
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={projectData.divisional_separation.penetrations}
-                              onChange={(e) => setProjectData(prev => ({
-                                ...prev,
-                                divisional_separation: {
-                                  ...prev.divisional_separation,
-                                  penetrations: e.target.checked
-                                }
-                              }))}
-                              className="mr-2"
-                            />
-                            Penetrations
-                          </label>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Separation Plan</label>
-                          <div className="flex items-center space-x-4">
-                            {projectData.divisional_separation.separation_plan && (
-                              <div className="relative">
-                                <img
-                                  src={projectData.divisional_separation.separation_plan}
-                                  alt="Separation Plan"
-                                  className="w-32 h-32 object-cover rounded"
-                                />
-                                <button
-                                  onClick={() => setProjectData(prev => ({
-                                    ...prev,
-                                    divisional_separation: {
-                                      ...prev.divisional_separation,
-                                      separation_plan: ''
-                                    }
-                                  }))}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                            {!projectData.divisional_separation.separation_plan && (
-                              <button
-                                onClick={() => {
-                                  // Add file upload logic here
-                                  setProjectData(prev => ({
-                                    ...prev,
-                                    divisional_separation: {
-                                      ...prev.divisional_separation,
-                                      separation_plan: 'placeholder.jpg'
-                                    }
-                                  }));
-                                }}
-                                className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                              >
-                                <Upload className="w-8 h-8" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Fire Alarm */}
-                    <div className="border rounded-lg p-4">
-                      <h3 className="text-xl font-semibold mb-4">Fire Alarm System</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Panel Layout</label>
-                          <div className="flex items-center space-x-4">
-                            {projectData.fire_alarm.panel_layout && (
-                              <div className="relative">
-                                <img
-                                  src={projectData.fire_alarm.panel_layout}
-                                  alt="Panel Layout"
-                                  className="w-32 h-32 object-cover rounded"
-                                />
-                                <button
-                                  onClick={() => setProjectData(prev => ({
-                                    ...prev,
-                                    fire_alarm: {
-                                      ...prev.fire_alarm,
-                                      panel_layout: ''
-                                    }
-                                  }))}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                            {!projectData.fire_alarm.panel_layout && (
-                              <button
-                                onClick={() => {
-                                  // Add file upload logic here
-                                  setProjectData(prev => ({
-                                    ...prev,
-                                    fire_alarm: {
-                                      ...prev.fire_alarm,
-                                      panel_layout: 'placeholder.jpg'
-                                    }
-                                  }));
-                                }}
-                                className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                              >
-                                <Upload className="w-8 h-8" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Sprinkler Zones */}
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Sprinkler Zones</label>
-                          <div className="space-y-2">
-                            {projectData.fire_alarm.sprinkler_zones.map((zone, index) => (
-                              <div key={index} className="flex items-center space-x-2">
-                                <input
-                                  type="text"
-                                  value={zone}
-                                  onChange={(e) => {
-                                    const newZones = [...projectData.fire_alarm.sprinkler_zones];
-                                    newZones[index] = e.target.value;
-                                    setProjectData(prev => ({
-                                      ...prev,
-                                      fire_alarm: {
-                                        ...prev.fire_alarm,
-                                        sprinkler_zones: newZones
-                                      }
-                                    }));
-                                  }}
-                                  className="flex-1 p-2 border rounded"
-                                  placeholder="Enter zone name"
-                                />
-                                <button
-                                  onClick={() => {
-                                    const newZones = projectData.fire_alarm.sprinkler_zones.filter((_, i) => i !== index);
-                                    setProjectData(prev => ({
-                                      ...prev,
-                                      fire_alarm: {
-                                        ...prev.fire_alarm,
-                                        sprinkler_zones: newZones
-                                      }
-                                    }));
-                                  }}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <X className="w-5 h-5" />
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              onClick={() => {
-                                const newZones = [...projectData.fire_alarm.sprinkler_zones, ''];
-                                setProjectData(prev => ({
-                                  ...prev,
-                                  fire_alarm: {
-                                    ...prev.fire_alarm,
-                                    sprinkler_zones: newZones
-                                  }
-                                }));
-                              }}
-                              className="btn-secondary flex items-center space-x-2"
-                            >
-                              <Plus className="w-4 h-4" />
-                              <span>Add Zone</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Hydrant Locations */}
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Hydrant Locations</label>
-                          <div className="space-y-2">
-                            {projectData.fire_alarm.hydrant_locations.map((location, index) => (
-                              <div key={index} className="flex items-center space-x-2">
-                                <input
-                                  type="text"
-                                  value={location}
-                                  onChange={(e) => {
-                                    const newLocations = [...projectData.fire_alarm.hydrant_locations];
-                                    newLocations[index] = e.target.value;
-                                    setProjectData(prev => ({
-                                      ...prev,
-                                      fire_alarm: {
-                                        ...prev.fire_alarm,
-                                        hydrant_locations: newLocations
-                                      }
-                                    }));
-                                  }}
-                                  className="flex-1 p-2 border rounded"
-                                  placeholder="Enter hydrant location"
-                                />
-                                <button
-                                  onClick={() => {
-                                    const newLocations = projectData.fire_alarm.hydrant_locations.filter((_, i) => i !== index);
-                                    setProjectData(prev => ({
-                                      ...prev,
-                                      fire_alarm: {
-                                        ...prev.fire_alarm,
-                                        hydrant_locations: newLocations
-                                      }
-                                    }));
-                                  }}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <X className="w-5 h-5" />
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              onClick={() => {
-                                const newLocations = [...projectData.fire_alarm.hydrant_locations, ''];
-                                setProjectData(prev => ({
-                                  ...prev,
-                                  fire_alarm: {
-                                    ...prev.fire_alarm,
-                                    hydrant_locations: newLocations
-                                  }
-                                }));
-                              }}
-                              className="btn-secondary flex items-center space-x-2"
-                            >
-                              <Plus className="w-4 h-4" />
-                              <span>Add Location</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {step === 6 && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Escape Routes & Signage</h2>
-                  <div className="space-y-6">
-                    {/* Escape Routes */}
-                    <div className="border rounded-lg p-4">
-                      <h3 className="text-xl font-semibold mb-4">Escape Routes</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Travel Distances</label>
-                          <textarea
-                            value={projectData.escape_routes.travel_distances}
-                            onChange={(e) => setProjectData(prev => ({
-                              ...prev,
-                              escape_routes: {
-                                ...prev.escape_routes,
-                                travel_distances: e.target.value
-                              }
-                            }))}
-                            className="w-full p-2 border rounded"
-                            placeholder="Enter travel distances"
-                            rows={3}
-                          />
-                        </div>
-
-                        {/* Emergency Lighting Zones */}
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Emergency Lighting Zones</label>
-                          <div className="space-y-2">
-                            {projectData.escape_routes.emergency_lighting_zones.map((zone, index) => (
-                              <div key={index} className="flex items-center space-x-2">
-                                <input
-                                  type="text"
-                                  value={zone}
-                                  onChange={(e) => {
-                                    const newZones = [...projectData.escape_routes.emergency_lighting_zones];
-                                    newZones[index] = e.target.value;
-                                    setProjectData(prev => ({
-                                      ...prev,
-                                      escape_routes: {
-                                        ...prev.escape_routes,
-                                        emergency_lighting_zones: newZones
-                                      }
-                                    }));
-                                  }}
-                                  className="flex-1 p-2 border rounded"
-                                  placeholder="Enter zone description"
-                                />
-                                <button
-                                  onClick={() => {
-                                    const newZones = projectData.escape_routes.emergency_lighting_zones.filter((_, i) => i !== index);
-                                    setProjectData(prev => ({
-                                      ...prev,
-                                      escape_routes: {
-                                        ...prev.escape_routes,
-                                        emergency_lighting_zones: newZones
-                                      }
-                                    }));
-                                  }}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <X className="w-5 h-5" />
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              onClick={() => {
-                                const newZones = [...projectData.escape_routes.emergency_lighting_zones, ''];
-                                setProjectData(prev => ({
-                                  ...prev,
-                                  escape_routes: {
-                                    ...prev.escape_routes,
-                                    emergency_lighting_zones: newZones
-                                  }
-                                }));
-                              }}
-                              className="btn-secondary flex items-center space-x-2"
-                            >
-                              <Plus className="w-4 h-4" />
-                              <span>Add Zone</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Door Rotation Diagrams */}
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Door Rotation Diagrams</label>
-                          <div className="flex flex-wrap gap-4">
-                            {projectData.escape_routes.door_rotation_diagrams.map((diagram, index) => (
-                              <div key={index} className="relative">
-                                <img
-                                  src={diagram}
-                                  alt={`Door Rotation Diagram ${index + 1}`}
-                                  className="w-32 h-32 object-cover rounded"
-                                />
-                                <button
-                                  onClick={() => {
-                                    const newDiagrams = projectData.escape_routes.door_rotation_diagrams.filter((_, i) => i !== index);
-                                    setProjectData(prev => ({
-                                      ...prev,
-                                      escape_routes: {
-                                        ...prev.escape_routes,
-                                        door_rotation_diagrams: newDiagrams
-                                      }
-                                    }));
-                                  }}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              onClick={() => {
-                                // Add file upload logic here
-                                const newDiagrams = [...projectData.escape_routes.door_rotation_diagrams, 'placeholder.jpg'];
-                                setProjectData(prev => ({
-                                  ...prev,
-                                  escape_routes: {
-                                    ...prev.escape_routes,
-                                    door_rotation_diagrams: newDiagrams
-                                  }
-                                }));
-                              }}
-                              className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                            >
-                              <Upload className="w-8 h-8" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Signage */}
-                    <div className="border rounded-lg p-4">
-                      <h3 className="text-xl font-semibold mb-4">Signage</h3>
+                  
+                  {expandedSections[`escape_route_${index}`] && (
+                    <div className="space-y-4">
                       <div>
-                        <label className="flex items-center">
+                        <Label htmlFor={`escape_routes.routes.${index}.name`}>Route Name</Label>
+                        <Input
+                          type="text"
+                          id={`escape_routes.routes.${index}.name`}
+                          value={route.name}
+                          onChange={(e) => {
+                            const newRoutes = [...formData.escape_routes.routes];
+                            newRoutes[index] = { ...route, name: e.target.value };
+                            handleInputChange('escape_routes.routes', newRoutes);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter route name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`escape_routes.routes.${index}.travel_distance`}>Travel Distance (m)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          id={`escape_routes.routes.${index}.travel_distance`}
+                          value={route.travel_distance}
+                          onChange={(e) => {
+                            const newRoutes = [...formData.escape_routes.routes];
+                            newRoutes[index] = { ...route, travel_distance: parseFloat(e.target.value) };
+                            handleInputChange('escape_routes.routes', newRoutes);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter travel distance"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`escape_routes.routes.${index}.width`}>Width (m)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          id={`escape_routes.routes.${index}.width`}
+                          value={route.width}
+                          onChange={(e) => {
+                            const newRoutes = [...formData.escape_routes.routes];
+                            newRoutes[index] = { ...route, width: parseFloat(e.target.value) };
+                            handleInputChange('escape_routes.routes', newRoutes);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter route width"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newRoutes = [...formData.escape_routes.routes, {
+                    name: '',
+                    travel_distance: 0,
+                    width: 0
+                  }];
+                  handleInputChange('escape_routes.routes', newRoutes);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Escape Route</span>
+              </button>
+            </div>
+
+            {/* Emergency Staircases Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Emergency Staircases</h4>
+              {formData.emergency_staircases.map((staircase, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleSection(`staircase_${index}`)}
+                    >
+                      <span className="font-medium">{staircase.name || `Staircase ${index + 1}`}</span>
+                      {expandedSections[`staircase_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newStaircases = formData.emergency_staircases.filter((_, i) => i !== index);
+                        handleInputChange('emergency_staircases', newStaircases);
+                      }}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  {expandedSections[`staircase_${index}`] && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`emergency_staircases.${index}.name`}>Staircase Name</Label>
+                        <Input
+                          type="text"
+                          id={`emergency_staircases.${index}.name`}
+                          value={staircase.name}
+                          onChange={(e) => {
+                            const newStaircases = [...formData.emergency_staircases];
+                            newStaircases[index] = { ...staircase, name: e.target.value };
+                            handleInputChange('emergency_staircases', newStaircases);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter staircase name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`emergency_staircases.${index}.width`}>Width (m)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          id={`emergency_staircases.${index}.width`}
+                          value={staircase.width}
+                          onChange={(e) => {
+                            const newStaircases = [...formData.emergency_staircases];
+                            newStaircases[index] = { ...staircase, width: parseFloat(e.target.value) };
+                            handleInputChange('emergency_staircases', newStaircases);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter staircase width"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`emergency_staircases.${index}.fire_rated`}>Fire Rated</Label>
+                        <label className={checkboxWrapperStyles}>
                           <input
                             type="checkbox"
-                            checked={projectData.signage.photoluminescent_signs}
-                            onChange={(e) => setProjectData(prev => ({
-                              ...prev,
-                              signage: {
-                                ...prev.signage,
-                                photoluminescent_signs: e.target.checked
-                              }
-                            }))}
-                            className="mr-2"
+                            id={`emergency_staircases.${index}.fire_rated`}
+                            checked={staircase.fire_rated}
+                            onChange={(e) => {
+                              const newStaircases = [...formData.emergency_staircases];
+                              newStaircases[index] = { ...staircase, fire_rated: e.target.checked };
+                              handleInputChange('emergency_staircases', newStaircases);
+                            }}
+                            className={checkboxStyles}
                           />
-                          Photoluminescent Signs
+                          <span className="text-sm font-medium group-hover:text-fire transition-colors duration-200">
+                            Fire Rated Staircase
+                          </span>
                         </label>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              ))}
+              <button
+                onClick={() => {
+                  const newStaircases = [...formData.emergency_staircases, {
+                    name: '',
+                    width: 0,
+                    fire_rated: false
+                  }];
+                  handleInputChange('emergency_staircases', newStaircases);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Emergency Staircase</span>
+              </button>
+            </div>
 
-              {step === 7 && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Special Risks & Mitigation</h2>
-                  <div className="space-y-6">
-                    {/* Pallet Storage */}
-                    <div className="border rounded-lg p-4">
-                      <h3 className="text-xl font-semibold mb-4">Pallet Storage</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">FMDS 8-24 Diagram</label>
-                          <div className="flex items-center space-x-4">
-                            {projectData.pallet_storage.fmds_8_24_diagram && (
-                              <div className="relative">
-                                <img
-                                  src={projectData.pallet_storage.fmds_8_24_diagram}
-                                  alt="FMDS 8-24 Diagram"
-                                  className="w-32 h-32 object-cover rounded"
-                                />
-                                <button
-                                  onClick={() => setProjectData(prev => ({
-                                    ...prev,
-                                    pallet_storage: {
-                                      ...prev.pallet_storage,
-                                      fmds_8_24_diagram: ''
-                                    }
-                                  }))}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                            {!projectData.pallet_storage.fmds_8_24_diagram && (
-                              <button
-                                onClick={() => {
-                                  // Add file upload logic here
-                                  setProjectData(prev => ({
-                                    ...prev,
-                                    pallet_storage: {
-                                      ...prev.pallet_storage,
-                                      fmds_8_24_diagram: 'placeholder.jpg'
-                                    }
-                                  }));
-                                }}
-                                className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                              >
-                                <Upload className="w-8 h-8" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Indoor Photo</label>
-                          <div className="flex items-center space-x-4">
-                            {projectData.pallet_storage.indoor_photo && (
-                              <div className="relative">
-                                <img
-                                  src={projectData.pallet_storage.indoor_photo}
-                                  alt="Indoor Pallet Storage"
-                                  className="w-32 h-32 object-cover rounded"
-                                />
-                                <button
-                                  onClick={() => setProjectData(prev => ({
-                                    ...prev,
-                                    pallet_storage: {
-                                      ...prev.pallet_storage,
-                                      indoor_photo: ''
-                                    }
-                                  }))}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                            {!projectData.pallet_storage.indoor_photo && (
-                              <button
-                                onClick={() => {
-                                  // Add file upload logic here
-                                  setProjectData(prev => ({
-                                    ...prev,
-                                    pallet_storage: {
-                                      ...prev.pallet_storage,
-                                      indoor_photo: 'placeholder.jpg'
-                                    }
-                                  }));
-                                }}
-                                className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                              >
-                                <Camera className="w-8 h-8" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
+            {/* Signage Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Signage</h4>
+              {formData.signage.items.map((item, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleSection(`signage_${index}`)}
+                    >
+                      <span className="font-medium">{item.type || `Sign ${index + 1}`}</span>
+                      {expandedSections[`signage_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newItems = formData.signage.items.filter((_, i) => i !== index);
+                        handleInputChange('signage.items', newItems);
+                      }}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  {expandedSections[`signage_${index}`] && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`signage.items.${index}.type`}>Sign Type</Label>
+                        <select
+                          id={`signage.items.${index}.type`}
+                          value={item.type}
+                          onChange={(e) => {
+                            const newItems = [...formData.signage.items];
+                            newItems[index] = { ...item, type: e.target.value };
+                            handleInputChange('signage.items', newItems);
+                          }}
+                          className={inputStyles}
+                        >
+                          <option value="">Select sign type</option>
+                          <option value="exit">Exit Sign</option>
+                          <option value="fire_extinguisher">Fire Extinguisher Sign</option>
+                          <option value="fire_hose_reel">Fire Hose Reel Sign</option>
+                          <option value="emergency_exit">Emergency Exit Sign</option>
+                          <option value="assembly_point">Assembly Point Sign</option>
+                          <option value="no_smoking">No Smoking Sign</option>
+                          <option value="fire_route">Fire Route Sign</option>
+                          <option value="fire_alarm">Fire Alarm Sign</option>
+                          <option value="first_aid">First Aid Sign</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor={`signage.items.${index}.location`}>Location</Label>
+                        <Input
+                          type="text"
+                          id={`signage.items.${index}.location`}
+                          value={item.location}
+                          onChange={(e) => {
+                            const newItems = [...formData.signage.items];
+                            newItems[index] = { ...item, location: e.target.value };
+                            handleInputChange('signage.items', newItems);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter sign location"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`signage.items.${index}.photoluminescent`}>Photoluminescent</Label>
+                        <label className={checkboxWrapperStyles}>
+                          <input
+                            type="checkbox"
+                            id={`signage.items.${index}.photoluminescent`}
+                            checked={item.photoluminescent}
+                            onChange={(e) => {
+                              const newItems = [...formData.signage.items];
+                              newItems[index] = { ...item, photoluminescent: e.target.checked };
+                              handleInputChange('signage.items', newItems);
+                            }}
+                            className={checkboxStyles}
+                          />
+                          <span className="text-sm font-medium group-hover:text-fire transition-colors duration-200">
+                            Photoluminescent Sign
+                          </span>
+                        </label>
                       </div>
                     </div>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newItems = [...formData.signage.items, {
+                    type: '',
+                    location: '',
+                    photoluminescent: false
+                  }];
+                  handleInputChange('signage.items', newItems);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Sign</span>
+              </button>
+            </div>
 
-                    {/* Oil Tanks */}
-                    <div className="border rounded-lg p-4">
-                      <h3 className="text-xl font-semibold mb-4">Oil Tanks</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Indoor Photo</label>
-                          <div className="flex items-center space-x-4">
-                            {projectData.oil_tanks.indoor_photo && (
-                              <div className="relative">
-                                <img
-                                  src={projectData.oil_tanks.indoor_photo}
-                                  alt="Indoor Oil Tanks"
-                                  className="w-32 h-32 object-cover rounded"
-                                />
-                                <button
-                                  onClick={() => setProjectData(prev => ({
-                                    ...prev,
-                                    oil_tanks: {
-                                      ...prev.oil_tanks,
-                                      indoor_photo: ''
-                                    }
-                                  }))}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                            {!projectData.oil_tanks.indoor_photo && (
-                              <button
-                                onClick={() => {
-                                  // Add file upload logic here
-                                  setProjectData(prev => ({
-                                    ...prev,
-                                    oil_tanks: {
-                                      ...prev.oil_tanks,
-                                      indoor_photo: 'placeholder.jpg'
-                                    }
-                                  }));
-                                }}
-                                className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                              >
-                                <Camera className="w-8 h-8" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Outdoor Photo</label>
-                          <div className="flex items-center space-x-4">
-                            {projectData.oil_tanks.outdoor_photo && (
-                              <div className="relative">
-                                <img
-                                  src={projectData.oil_tanks.outdoor_photo}
-                                  alt="Outdoor Oil Tanks"
-                                  className="w-32 h-32 object-cover rounded"
-                                />
-                                <button
-                                  onClick={() => setProjectData(prev => ({
-                                    ...prev,
-                                    oil_tanks: {
-                                      ...prev.oil_tanks,
-                                      outdoor_photo: ''
-                                    }
-                                  }))}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                            {!projectData.oil_tanks.outdoor_photo && (
-                              <button
-                                onClick={() => {
-                                  // Add file upload logic here
-                                  setProjectData(prev => ({
-                                    ...prev,
-                                    oil_tanks: {
-                                      ...prev.oil_tanks,
-                                      outdoor_photo: 'placeholder.jpg'
-                                    }
-                                  }));
-                                }}
-                                className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                              >
-                                <Camera className="w-8 h-8" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={projectData.oil_tanks.bunding_compliant}
-                              onChange={(e) => setProjectData(prev => ({
-                                ...prev,
-                                oil_tanks: {
-                                  ...prev.oil_tanks,
-                                  bunding_compliant: e.target.checked
-                                }
-                              }))}
-                              className="mr-2"
-                            />
-                            Bunding Compliant
-                          </label>
-                        </div>
+            {/* Emergency Lighting Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Emergency Lighting</h4>
+              {formData.emergency_lighting.zones.map((zone, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleSection(`emergency_lighting_${index}`)}
+                    >
+                      <span className="font-medium">{zone.name || `Zone ${index + 1}`}</span>
+                      {expandedSections[`emergency_lighting_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newZones = formData.emergency_lighting.zones.filter((_, i) => i !== index);
+                        handleInputChange('emergency_lighting.zones', newZones);
+                      }}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  {expandedSections[`emergency_lighting_${index}`] && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`emergency_lighting.zones.${index}.name`}>Zone Name</Label>
+                        <Input
+                          type="text"
+                          id={`emergency_lighting.zones.${index}.name`}
+                          value={zone.name}
+                          onChange={(e) => {
+                            const newZones = [...formData.emergency_lighting.zones];
+                            newZones[index] = { ...zone, name: e.target.value };
+                            handleInputChange('emergency_lighting.zones', newZones);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter zone name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`emergency_lighting.zones.${index}.duration`}>Duration (hours)</Label>
+                        <Input
+                          type="number"
+                          step="0.5"
+                          id={`emergency_lighting.zones.${index}.duration`}
+                          value={zone.duration}
+                          onChange={(e) => {
+                            const newZones = [...formData.emergency_lighting.zones];
+                            newZones[index] = { ...zone, duration: parseFloat(e.target.value) };
+                            handleInputChange('emergency_lighting.zones', newZones);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter duration"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`emergency_lighting.zones.${index}.lux_level`}>Lux Level (lx)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          id={`emergency_lighting.zones.${index}.lux_level`}
+                          value={zone.lux_level}
+                          onChange={(e) => {
+                            const newZones = [...formData.emergency_lighting.zones];
+                            newZones[index] = { ...zone, lux_level: parseFloat(e.target.value) };
+                            handleInputChange('emergency_lighting.zones', newZones);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter lux level"
+                        />
                       </div>
                     </div>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newZones = [...formData.emergency_lighting.zones, {
+                    name: '',
+                    duration: 0,
+                    lux_level: 0
+                  }];
+                  handleInputChange('emergency_lighting.zones', newZones);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Emergency Lighting Zone</span>
+              </button>
+            </div>
+
+            {/* Fire Hose Reels Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Fire Hose Reels</h4>
+              {formData.fire_hose_reels.map((reel, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleSection(`hose_reel_${index}`)}
+                    >
+                      <span className="font-medium">{reel.location || `Hose Reel ${index + 1}`}</span>
+                      {expandedSections[`hose_reel_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newReels = formData.fire_hose_reels.filter((_, i) => i !== index);
+                        handleInputChange('fire_hose_reels', newReels);
+                      }}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  {expandedSections[`hose_reel_${index}`] && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`fire_hose_reels.${index}.location`}>Location</Label>
+                        <Input
+                          type="text"
+                          id={`fire_hose_reels.${index}.location`}
+                          value={reel.location}
+                          onChange={(e) => {
+                            const newReels = [...formData.fire_hose_reels];
+                            newReels[index] = { ...reel, location: e.target.value };
+                            handleInputChange('fire_hose_reels', newReels);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter hose reel location"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`fire_hose_reels.${index}.hose_length`}>Hose Length (m)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          id={`fire_hose_reels.${index}.hose_length`}
+                          value={reel.hose_length}
+                          onChange={(e) => {
+                            const newReels = [...formData.fire_hose_reels];
+                            newReels[index] = { ...reel, hose_length: parseFloat(e.target.value) };
+                            handleInputChange('fire_hose_reels', newReels);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter hose length"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`fire_hose_reels.${index}.coverage_radius`}>Coverage Radius (m)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          id={`fire_hose_reels.${index}.coverage_radius`}
+                          value={reel.coverage_radius}
+                          onChange={(e) => {
+                            const newReels = [...formData.fire_hose_reels];
+                            newReels[index] = { ...reel, coverage_radius: parseFloat(e.target.value) };
+                            handleInputChange('fire_hose_reels', newReels);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter coverage radius"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newReels = [...formData.fire_hose_reels, {
+                    location: '',
+                    hose_length: 0,
+                    coverage_radius: 0
+                  }];
+                  handleInputChange('fire_hose_reels', newReels);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Fire Hose Reel</span>
+              </button>
+            </div>
+
+            {/* Fire Extinguishers Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Fire Extinguishers</h4>
+              {formData.fire_extinguishers.map((extinguisher, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleSection(`extinguisher_${index}`)}
+                    >
+                      <span className="font-medium">{extinguisher.type || `Extinguisher ${index + 1}`}</span>
+                      {expandedSections[`extinguisher_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newExtinguishers = formData.fire_extinguishers.filter((_, i) => i !== index);
+                        handleInputChange('fire_extinguishers', newExtinguishers);
+                      }}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  {expandedSections[`extinguisher_${index}`] && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`fire_extinguishers.${index}.type`}>Extinguisher Type</Label>
+                        <select
+                          id={`fire_extinguishers.${index}.type`}
+                          value={extinguisher.type}
+                          onChange={(e) => {
+                            const newExtinguishers = [...formData.fire_extinguishers];
+                            newExtinguishers[index] = { ...extinguisher, type: e.target.value };
+                            handleInputChange('fire_extinguishers', newExtinguishers);
+                          }}
+                          className={inputStyles}
+                        >
+                          <option value="">Select extinguisher type</option>
+                          <option value="water">Water</option>
+                          <option value="foam">Foam</option>
+                          <option value="co2">CO2</option>
+                          <option value="dry_chemical">Dry Chemical</option>
+                          <option value="wet_chemical">Wet Chemical</option>
+                          <option value="clean_agent">Clean Agent</option>
+                          <option value="special">Special</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor={`fire_extinguishers.${index}.location`}>Location</Label>
+                        <Input
+                          type="text"
+                          id={`fire_extinguishers.${index}.location`}
+                          value={extinguisher.location}
+                          onChange={(e) => {
+                            const newExtinguishers = [...formData.fire_extinguishers];
+                            newExtinguishers[index] = { ...extinguisher, location: e.target.value };
+                            handleInputChange('fire_extinguishers', newExtinguishers);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter extinguisher location"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`fire_extinguishers.${index}.capacity`}>Capacity (kg)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          id={`fire_extinguishers.${index}.capacity`}
+                          value={extinguisher.capacity}
+                          onChange={(e) => {
+                            const newExtinguishers = [...formData.fire_extinguishers];
+                            newExtinguishers[index] = { ...extinguisher, capacity: parseFloat(e.target.value) };
+                            handleInputChange('fire_extinguishers', newExtinguishers);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter extinguisher capacity"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newExtinguishers = [...formData.fire_extinguishers, {
+                    type: '',
+                    location: '',
+                    capacity: 0
+                  }];
+                  handleInputChange('fire_extinguishers', newExtinguishers);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Fire Extinguisher</span>
+              </button>
+            </div>
+
+            {/* Fire Hydrants Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Fire Hydrants</h4>
+              {formData.fire_hydrants.map((hydrant, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleSection(`hydrant_${index}`)}
+                    >
+                      <span className="font-medium">{hydrant.location || `Hydrant ${index + 1}`}</span>
+                      {expandedSections[`hydrant_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newHydrants = formData.fire_hydrants.filter((_, i) => i !== index);
+                        handleInputChange('fire_hydrants', newHydrants);
+                      }}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  {expandedSections[`hydrant_${index}`] && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`fire_hydrants.${index}.location`}>Location</Label>
+                        <Input
+                          type="text"
+                          id={`fire_hydrants.${index}.location`}
+                          value={hydrant.location}
+                          onChange={(e) => {
+                            const newHydrants = [...formData.fire_hydrants];
+                            newHydrants[index] = { ...hydrant, location: e.target.value };
+                            handleInputChange('fire_hydrants', newHydrants);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter hydrant location"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`fire_hydrants.${index}.type`}>Hydrant Type</Label>
+                        <select
+                          id={`fire_hydrants.${index}.type`}
+                          value={hydrant.type}
+                          onChange={(e) => {
+                            const newHydrants = [...formData.fire_hydrants];
+                            newHydrants[index] = { ...hydrant, type: e.target.value };
+                            handleInputChange('fire_hydrants', newHydrants);
+                          }}
+                          className={inputStyles}
+                        >
+                          <option value="">Select hydrant type</option>
+                          <option value="underground">Underground</option>
+                          <option value="pillar">Pillar</option>
+                          <option value="wall">Wall</option>
+                          <option value="roof">Roof</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor={`fire_hydrants.${index}.flow_rate`}>Flow Rate (L/min)</Label>
+                        <Input
+                          type="number"
+                          step="1"
+                          id={`fire_hydrants.${index}.flow_rate`}
+                          value={hydrant.flow_rate}
+                          onChange={(e) => {
+                            const newHydrants = [...formData.fire_hydrants];
+                            newHydrants[index] = { ...hydrant, flow_rate: parseFloat(e.target.value) };
+                            handleInputChange('fire_hydrants', newHydrants);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter flow rate"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newHydrants = [...formData.fire_hydrants, {
+                    location: '',
+                    type: '',
+                    flow_rate: 0
+                  }];
+                  handleInputChange('fire_hydrants', newHydrants);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Fire Hydrant</span>
+              </button>
+            </div>
+
+            {/* Fire Water Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Fire Water</h4>
+              <div className={cardStyles}>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="firewater.source">Water Source</Label>
+                    <select
+                      id="firewater.source"
+                      value={formData.firewater.source}
+                      onChange={(e) => handleInputChange('firewater.source', e.target.value)}
+                      className={inputStyles}
+                    >
+                      <option value="">Select water source</option>
+                      <option value="municipal">Municipal Supply</option>
+                      <option value="storage_tank">Storage Tank</option>
+                      <option value="dam">Dam</option>
+                      <option value="river">River</option>
+                      <option value="borehole">Borehole</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="firewater.capacity">Storage Capacity (kL)</Label>
+                    <Input
+                      type="number"
+                      step="1"
+                      id="firewater.capacity"
+                      value={formData.firewater.capacity}
+                      onChange={(e) => handleInputChange('firewater.capacity', parseFloat(e.target.value))}
+                      className={inputStyles}
+                      placeholder="Enter storage capacity"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="firewater.pressure">Pressure (kPa)</Label>
+                    <Input
+                      type="number"
+                      step="1"
+                      id="firewater.pressure"
+                      value={formData.firewater.pressure}
+                      onChange={(e) => handleInputChange('firewater.pressure', parseFloat(e.target.value))}
+                      className={inputStyles}
+                      placeholder="Enter pressure"
+                    />
                   </div>
                 </div>
-              )}
+              </div>
+            </div>
 
-              {step === 8 && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Final Summary & Recommendations</h2>
-                  <div className="space-y-6">
-                    {/* Mandatory Actions */}
-                    <div className="border rounded-lg p-4">
-                      <h3 className="text-xl font-semibold mb-4">Mandatory Actions</h3>
-                      <div className="space-y-2">
-                        {projectData.mandatory_actions.map((action, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              value={action}
-                              onChange={(e) => {
-                                const newActions = [...projectData.mandatory_actions];
-                                newActions[index] = e.target.value;
-                                setProjectData(prev => ({
-                                  ...prev,
-                                  mandatory_actions: newActions
-                                }));
-                              }}
-                              className="flex-1 p-2 border rounded"
-                              placeholder="Enter mandatory action"
-                            />
-                            <button
-                              onClick={() => {
-                                const newActions = projectData.mandatory_actions.filter((_, i) => i !== index);
-                                setProjectData(prev => ({
-                                  ...prev,
-                                  mandatory_actions: newActions
-                                }));
-                              }}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
-                          </div>
-                        ))}
+            {/* Fire Detection and Alarm Systems Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Fire Detection and Alarm Systems</h4>
+              <div className={cardStyles}>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="fire_detection.type">System Type</Label>
+                    <select
+                      id="fire_detection.type"
+                      value={formData.fire_detection.type}
+                      onChange={(e) => handleInputChange('fire_detection.type', e.target.value)}
+                      className={inputStyles}
+                    >
+                      <option value="">Select system type</option>
+                      <option value="conventional">Conventional</option>
+                      <option value="addressable">Addressable</option>
+                      <option value="wireless">Wireless</option>
+                      <option value="hybrid">Hybrid</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="fire_detection.zones">Number of Zones</Label>
+                    <Input
+                      type="number"
+                      step="1"
+                      id="fire_detection.zones"
+                      value={formData.fire_detection.zones}
+                      onChange={(e) => handleInputChange('fire_detection.zones', parseInt(e.target.value))}
+                      className={inputStyles}
+                      placeholder="Enter number of zones"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fire_detection.battery_backup">Battery Backup Duration (hours)</Label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      id="fire_detection.battery_backup"
+                      value={formData.fire_detection.battery_backup}
+                      onChange={(e) => handleInputChange('fire_detection.battery_backup', parseFloat(e.target.value))}
+                      className={inputStyles}
+                      placeholder="Enter battery backup duration"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Fire Alarm Panel and Zones Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Fire Alarm Panel and Zones</h4>
+              <div className={cardStyles}>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="fire_alarm.panel_layout">Panel Layout</Label>
+                    <div className="flex items-center space-x-4">
+                      {formData.fire_alarm.panel_layout ? (
+                        <div className="relative">
+                          <img
+                            src={formData.fire_alarm.panel_layout}
+                            alt="Panel Layout"
+                            className="w-32 h-32 object-cover rounded-2xl"
+                          />
+                          <button
+                            onClick={() => handleInputChange('fire_alarm.panel_layout', '')}
+                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
                         <button
                           onClick={() => {
-                            const newActions = [...projectData.mandatory_actions, ''];
-                            setProjectData(prev => ({
-                              ...prev,
-                              mandatory_actions: newActions
-                            }));
+                            // Add file upload logic here
+                            handleInputChange('fire_alarm.panel_layout', 'placeholder.jpg');
                           }}
-                          className="btn-secondary flex items-center space-x-2"
+                          className="w-32 h-32 border-2 border-dashed rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-600"
                         >
-                          <Plus className="w-4 h-4" />
-                          <span>Add Mandatory Action</span>
+                          <Upload className="w-8 h-8" />
                         </button>
-                      </div>
-                    </div>
-
-                    {/* Optional Actions */}
-                    <div className="border rounded-lg p-4">
-                      <h3 className="text-xl font-semibold mb-4">Optional Actions</h3>
-                      <div className="space-y-2">
-                        {projectData.optional_actions.map((action, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              value={action}
-                              onChange={(e) => {
-                                const newActions = [...projectData.optional_actions];
-                                newActions[index] = e.target.value;
-                                setProjectData(prev => ({
-                                  ...prev,
-                                  optional_actions: newActions
-                                }));
-                              }}
-                              className="flex-1 p-2 border rounded"
-                              placeholder="Enter optional action"
-                            />
-                            <button
-                              onClick={() => {
-                                const newActions = projectData.optional_actions.filter((_, i) => i !== index);
-                                setProjectData(prev => ({
-                                  ...prev,
-                                  optional_actions: newActions
-                                }));
-                              }}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
-                          </div>
-                        ))}
-                        <button
-                          onClick={() => {
-                            const newActions = [...projectData.optional_actions, ''];
-                            setProjectData(prev => ({
-                              ...prev,
-                              optional_actions: newActions
-                            }));
-                          }}
-                          className="btn-secondary flex items-center space-x-2"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>Add Optional Action</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Engineer Signoff */}
-                    <div className="border rounded-lg p-4">
-                      <h3 className="text-xl font-semibold mb-4">Engineer Signoff</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Engineer Name</label>
-                          <input
-                            type="text"
-                            value={projectData.engineer_signoff.name}
-                            onChange={(e) => setProjectData(prev => ({
-                              ...prev,
-                              engineer_signoff: {
-                                ...prev.engineer_signoff,
-                                name: e.target.value
-                              }
-                            }))}
-                            className="w-full p-2 border rounded"
-                            placeholder="Enter engineer name"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">ECSA Number</label>
-                          <input
-                            type="text"
-                            value={projectData.engineer_signoff.ecsa_number}
-                            onChange={(e) => setProjectData(prev => ({
-                              ...prev,
-                              engineer_signoff: {
-                                ...prev.engineer_signoff,
-                                ecsa_number: e.target.value
-                              }
-                            }))}
-                            className="w-full p-2 border rounded"
-                            placeholder="Enter ECSA number"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Signature</label>
-                          <div className="flex items-center space-x-4">
-                            {projectData.engineer_signoff.signature && (
-                              <div className="relative">
-                                <img
-                                  src={projectData.engineer_signoff.signature}
-                                  alt="Engineer Signature"
-                                  className="w-32 h-32 object-cover rounded"
-                                />
-                                <button
-                                  onClick={() => setProjectData(prev => ({
-                                    ...prev,
-                                    engineer_signoff: {
-                                      ...prev.engineer_signoff,
-                                      signature: ''
-                                    }
-                                  }))}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                            {!projectData.engineer_signoff.signature && (
-                              <button
-                                onClick={() => {
-                                  // Add signature capture logic here
-                                  setProjectData(prev => ({
-                                    ...prev,
-                                    engineer_signoff: {
-                                      ...prev.engineer_signoff,
-                                      signature: 'placeholder.jpg'
-                                    }
-                                  }));
-                                }}
-                                className="w-32 h-32 border-2 border-dashed rounded flex items-center justify-center text-gray-400 hover:text-gray-600"
-                              >
-                                <Upload className="w-8 h-8" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* Navigation Buttons */}
-              <div className="flex justify-between mt-12">
+              {/* Fire Alarm Zones */}
+              <div className="space-y-4">
+                <h5 className="font-medium">Fire Alarm Zones</h5>
+                {formData.fire_alarm.sprinkler_zones.map((zone, index) => (
+                  <div key={index} className={cardStyles}>
+                    <div className="flex items-center justify-between mb-4">
+                      <button
+                        className="flex items-center justify-between flex-grow"
+                        onClick={() => toggleSection(`fire_alarm_zone_${index}`)}
+                      >
+                        <span className="font-medium">{zone || `Zone ${index + 1}`}</span>
+                        {expandedSections[`fire_alarm_zone_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const newZones = formData.fire_alarm.sprinkler_zones.filter((_, i) => i !== index);
+                          handleInputChange('fire_alarm.sprinkler_zones', newZones);
+                        }}
+                        className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    
+                    {expandedSections[`fire_alarm_zone_${index}`] && (
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor={`fire_alarm.sprinkler_zones.${index}`}>Zone Name</Label>
+                          <Input
+                            type="text"
+                            id={`fire_alarm.sprinkler_zones.${index}`}
+                            value={zone}
+                            onChange={(e) => {
+                              const newZones = [...formData.fire_alarm.sprinkler_zones];
+                              newZones[index] = e.target.value;
+                              handleInputChange('fire_alarm.sprinkler_zones', newZones);
+                            }}
+                            className={inputStyles}
+                            placeholder="Enter zone name"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
                 <button
-                  onClick={prevStep}
-                  disabled={step === 1}
-                  className={`${buttonStyles} btn-secondary disabled:opacity-50 disabled:cursor-not-allowed`}
+                  onClick={() => {
+                    const newZones = [...formData.fire_alarm.sprinkler_zones, ''];
+                    handleInputChange('fire_alarm.sprinkler_zones', newZones);
+                  }}
+                  className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  <span>Previous</span>
-                </button>
-                <button
-                  onClick={nextStep}
-                  disabled={step === totalSteps}
-                  className={`${buttonStyles} btn-primary disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <span>Next</span>
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  <Plus className="w-4 h-4" />
+                  <span>Add Fire Alarm Zone</span>
                 </button>
               </div>
             </div>
+
+            {/* Smoke Ventilation Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Smoke Ventilation</h4>
+              {formData.smoke_ventilation.zones.map((zone, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex items-center justify-between flex-grow"
+                      onClick={() => toggleSection(`smoke_ventilation_${index}`)}
+                    >
+                      <span className="font-medium">{zone.name || `Zone ${index + 1}`}</span>
+                      {expandedSections[`smoke_ventilation_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newZones = formData.smoke_ventilation.zones.filter((_, i) => i !== index);
+                        handleInputChange('smoke_ventilation.zones', newZones);
+                      }}
+                      className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  {expandedSections[`smoke_ventilation_${index}`] && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`smoke_ventilation.zones.${index}.name`}>Zone Name</Label>
+                        <Input
+                          type="text"
+                          id={`smoke_ventilation.zones.${index}.name`}
+                          value={zone.name}
+                          onChange={(e) => {
+                            const newZones = [...formData.smoke_ventilation.zones];
+                            newZones[index] = { ...zone, name: e.target.value };
+                            handleInputChange('smoke_ventilation.zones', newZones);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter zone name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`smoke_ventilation.zones.${index}.area`}>Ventilation Area (m²)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          id={`smoke_ventilation.zones.${index}.area`}
+                          value={zone.area}
+                          onChange={(e) => {
+                            const newZones = [...formData.smoke_ventilation.zones];
+                            newZones[index] = { ...zone, area: parseFloat(e.target.value) };
+                            handleInputChange('smoke_ventilation.zones', newZones);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter ventilation area"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`smoke_ventilation.zones.${index}.ventilation_rate`}>Ventilation Rate (m³/s)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          id={`smoke_ventilation.zones.${index}.ventilation_rate`}
+                          value={zone.ventilation_rate}
+                          onChange={(e) => {
+                            const newZones = [...formData.smoke_ventilation.zones];
+                            newZones[index] = { ...zone, ventilation_rate: parseFloat(e.target.value) };
+                            handleInputChange('smoke_ventilation.zones', newZones);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter ventilation rate"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newZones = [...formData.smoke_ventilation.zones, {
+                    name: '',
+                    area: 0,
+                    ventilation_rate: 0
+                  }];
+                  handleInputChange('smoke_ventilation.zones', newZones);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Smoke Ventilation Zone</span>
+              </button>
+            </div>
           </div>
-        </div>
-      </main>
+        );
+      case 6:
+        return (
+          <div className="space-y-6">
+            {/* Special Risks Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Special Risks</h4>
+              {formData.special_risks.map((risk, index) => (
+                <div key={index} className={cardStyles}>
+                  <button
+                    className="w-full flex items-center justify-between mb-4"
+                    onClick={() => toggleSection(`special_risk_${index}`)}
+                  >
+                    <span className="font-medium">{risk.type || `Special Risk ${index + 1}`}</span>
+                    {expandedSections[`special_risk_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                  </button>
+                  
+                  {expandedSections[`special_risk_${index}`] && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`special_risks.${index}.type`}>Risk Type</Label>
+                        <select
+                          id={`special_risks.${index}.type`}
+                          value={risk.type}
+                          onChange={(e) => {
+                            const newRisks = [...formData.special_risks];
+                            newRisks[index] = { ...risk, type: e.target.value };
+                            handleInputChange('special_risks', newRisks);
+                          }}
+                          className={inputStyles}
+                        >
+                          <option value="">Select risk type</option>
+                          <option value="diesel_tank">Diesel Tank</option>
+                          <option value="transformer">Transformer</option>
+                          <option value="decommissioned_tanks">Decommissioned Tanks</option>
+                          <option value="inverter_battery_room">Inverter & Battery Room</option>
+                          <option value="pallet_storage">Idle Pallet Storage</option>
+                          <option value="forklift_charging">Forklift Charging Station</option>
+                          <option value="substation">Substation</option>
+                          <option value="oil_tank">Oil Tank</option>
+                          <option value="generator">Generator</option>
+                          <option value="mezzanine">Mezzanine</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor={`special_risks.${index}.location`}>Location</Label>
+                        <Input
+                          type="text"
+                          id={`special_risks.${index}.location`}
+                          value={risk.location}
+                          onChange={(e) => {
+                            const newRisks = [...formData.special_risks];
+                            newRisks[index] = { ...risk, location: e.target.value };
+                            handleInputChange('special_risks', newRisks);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter location"
+                        />
+                    </div>
+                      <div>
+                        <Label htmlFor={`special_risks.${index}.details`}>Details</Label>
+                        <Textarea
+                          id={`special_risks.${index}.details`}
+                          value={risk.details}
+                          onChange={(e) => {
+                            const newRisks = [...formData.special_risks];
+                            newRisks[index] = { ...risk, details: e.target.value };
+                            handleInputChange('special_risks', newRisks);
+                          }}
+                          className={inputStyles}
+                          placeholder="Enter additional details"
+                        />
+                  </div>
+                      <div>
+                        <Label htmlFor={`special_risks.${index}.photo`}>Photo</Label>
+                        <div className="flex items-center space-x-4">
+                          {risk.photo ? (
+                            <div className="relative">
+                              <img
+                                src={risk.photo}
+                                alt={`${risk.type} Photo`}
+                                className="w-32 h-32 object-cover rounded-2xl"
+                              />
+                              <button
+                                onClick={() => {
+                                  const newRisks = [...formData.special_risks];
+                                  newRisks[index] = { ...risk, photo: '' };
+                                  handleInputChange('special_risks', newRisks);
+                                }}
+                                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                      </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                // Add file upload logic here
+                                const newRisks = [...formData.special_risks];
+                                newRisks[index] = { ...risk, photo: 'placeholder.jpg' };
+                                handleInputChange('special_risks', newRisks);
+                              }}
+                              className="w-32 h-32 border-2 border-dashed rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-600"
+                            >
+                              <Upload className="w-8 h-8" />
+                            </button>
+                          )}
+                    </div>
+                  </div>
+                      <button
+                        onClick={() => {
+                          const newRisks = formData.special_risks.filter((_, i) => i !== index);
+                          handleInputChange('special_risks', newRisks);
+                        }}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                </div>
+                  )}
+              </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newRisks = [...formData.special_risks, {
+                    type: '',
+                    location: '',
+                    details: '',
+                    photo: ''
+                  }];
+                  handleInputChange('special_risks', newRisks);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Special Risk</span>
+              </button>
+            </div>
+          </div>
+        );
+      case 7:
+        return (
+          <div className="space-y-6">
+            {/* Project Summary Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Project Summary</h4>
+              
+              {/* Step 1: Project Setup */}
+              <div className={cardStyles}>
+                <h5 className="font-medium mb-4">Step 1: Project Setup</h5>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Report Type</p>
+                      <p className="font-medium">{reportTypes.find(t => t.id === formData.reportType)?.name || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Company Name</p>
+                      <p className="font-medium">{formData.company_name || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Client Name</p>
+                      <p className="font-medium">{formData.client_name || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Facility Process</p>
+                      <p className="font-medium">{formData.facility_process || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Location</p>
+                      <p className="font-medium">{formData.facility_location.town && formData.facility_location.province 
+                        ? `${formData.facility_location.town}, ${formData.facility_location.province}`
+                        : 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Construction Year</p>
+                      <p className="font-medium">{formData.construction_year || 'Not specified'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2: Occupancy Classification */}
+              <div className={cardStyles}>
+                <h5 className="font-medium mb-4">Step 2: Occupancy Classification</h5>
+                <div className="space-y-4">
+                  {formData.buildings.map((building, index) => (
+                    <div key={index} className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Building {index + 1}</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Name</p>
+                          <p className="font-medium">{building.name || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Classification</p>
+                          <p className="font-medium">{building.classification || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total Floor Area</p>
+                          <p className="font-medium">{building.total_floor_area ? `${building.total_floor_area} m²` : 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Construction Materials</p>
+                          <p className="font-medium">
+                            {Object.entries(building.construction_materials)
+                              .filter(([_, value]) => value)
+                              .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1))
+                              .join(', ') || 'Not specified'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 3: Facility Overview */}
+              <div className={cardStyles}>
+                <h5 className="font-medium mb-4">Step 3: Facility Overview</h5>
+                <div className="space-y-4">
+                  {formData.zones.map((zone, index) => (
+                    <div key={index} className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Zone {index + 1}</p>
+                      <p className="font-medium">{zone.name || 'Not specified'}</p>
+                      <p className="text-sm text-muted-foreground">Photos: {zone.photos.length}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 4: Commodity Classification */}
+              <div className={cardStyles}>
+                <h5 className="font-medium mb-4">Step 4: Commodity Classification</h5>
+                <div className="space-y-4">
+                  {formData.buildings[0]?.fire_load.commodities.map((commodity, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Commodity Name</p>
+                          <p className="font-medium">{commodity.name || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Category</p>
+                          <p className="font-medium">{commodity.category || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Stacking Height</p>
+                          <p className="font-medium">{commodity.minimum_stacking_height ? `${commodity.minimum_stacking_height} m` : 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Storage Type</p>
+                          <p className="font-medium">{commodity.storage_type || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 5: Fire Protection Systems */}
+              <div className={cardStyles}>
+                <h5 className="font-medium mb-4">Step 5: Fire Protection Systems</h5>
+                <div className="space-y-4">
+                  {/* Fire Alarm System */}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Fire Alarm System</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">System Type</p>
+                        <p className="font-medium">{formData.fire_detection.type || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Number of Zones</p>
+                        <p className="font-medium">{formData.fire_detection.zones || 'Not specified'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Fire Extinguishers */}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Fire Extinguishers</p>
+                    <p className="font-medium">{formData.fire_extinguishers.length} units</p>
+                  </div>
+
+                  {/* Fire Hose Reels */}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Fire Hose Reels</p>
+                    <p className="font-medium">{formData.fire_hose_reels.length} units</p>
+                  </div>
+
+                  {/* Fire Hydrants */}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Fire Hydrants</p>
+                    <p className="font-medium">{formData.fire_hydrants.length} units</p>
+                  </div>
+
+                  {/* Smoke Ventilation */}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Smoke Ventilation Zones</p>
+                    <p className="font-medium">{formData.smoke_ventilation.zones.length} zones</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 6: Special Risks */}
+              <div className={cardStyles}>
+                <h5 className="font-medium mb-4">Step 6: Special Risks</h5>
+                <div className="space-y-4">
+                  {formData.special_risks.map((risk, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Risk Type</p>
+                          <p className="font-medium">{risk.type || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Location</p>
+                          <p className="font-medium">{risk.location || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Mandatory Actions Section */}
+            <div className="space-y-2">
+              <Label htmlFor="mandatory_actions">Mandatory Actions</Label>
+              {formData.mandatory_actions.map((action, index) => (
+                <div key={index} className={cardStyles}>
+                  <button
+                    className="w-full flex items-center justify-between mb-4"
+                    onClick={() => toggleSection(`mandatory_${index}`)}
+                  >
+                    <span className="font-medium">{action || `Mandatory Action ${index + 1}`}</span>
+                    {expandedSections[`mandatory_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                  </button>
+                  
+                  {expandedSections[`mandatory_${index}`] && (
+                    <div className="space-y-4">
+                      <Input
+                        type="text"
+                        id={`mandatory_actions.${index}`}
+                        value={action}
+                        onChange={(e) => {
+                          const newActions = [...formData.mandatory_actions];
+                          newActions[index] = e.target.value;
+                          handleInputChange('mandatory_actions', newActions);
+                        }}
+                        className={inputStyles}
+                        placeholder="Enter mandatory action"
+                      />
+                      <button
+                        onClick={() => {
+                          const newActions = formData.mandatory_actions.filter((_, i) => i !== index);
+                          handleInputChange('mandatory_actions', newActions);
+                        }}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newActions = [...formData.mandatory_actions, ''];
+                  handleInputChange('mandatory_actions', newActions);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Mandatory Action</span>
+              </button>
+            </div>
+                <div className="space-y-2">
+              <Label htmlFor="optional_actions">Optional Actions</Label>
+              {formData.optional_actions.map((action, index) => (
+                <div key={index} className={cardStyles}>
+                  <button
+                    className="w-full flex items-center justify-between mb-4"
+                    onClick={() => toggleSection(`optional_${index}`)}
+                  >
+                    <span className="font-medium">{action || `Optional Action ${index + 1}`}</span>
+                    {expandedSections[`optional_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                  </button>
+                  
+                  {expandedSections[`optional_${index}`] && (
+                    <div className="space-y-4">
+                      <Input
+                        type="text"
+                        id={`optional_actions.${index}`}
+                        value={action}
+                        onChange={(e) => {
+                          const newActions = [...formData.optional_actions];
+                          newActions[index] = e.target.value;
+                          handleInputChange('optional_actions', newActions);
+                        }}
+                        className={inputStyles}
+                        placeholder="Enter optional action"
+                      />
+                      <button
+                        onClick={() => {
+                          const newActions = formData.optional_actions.filter((_, i) => i !== index);
+                          handleInputChange('optional_actions', newActions);
+                        }}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                  </div>
+                  )}
+                  </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newActions = [...formData.optional_actions, ''];
+                  handleInputChange('optional_actions', newActions);
+                }}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Optional Action</span>
+              </button>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold">Create New Project</h1>
+          <p className="text-sm text-muted-foreground">
+            Complete the form below to create a new project
+                    </p>
+                  </div>
+        <Button
+          variant="outline"
+          onClick={handleSaveDraft}
+          disabled={loading}
+          className="gap-2"
+        >
+          <FileText className="w-4 h-4" />
+          Save Draft
+        </Button>
+                </div>
+      
+      <Card className="p-8">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Progress Steps */}
+          <div className="relative mb-12">
+            {/* Progress Bar */}
+            <div className="absolute top-1/2 left-0 w-full h-1 bg-secondary transform -translate-y-1/2">
+              <div 
+                className="h-full bg-fire transition-all duration-300 rounded-full"
+                style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
+              />
+            </div>
+
+            {/* Step Buttons */}
+            <div className="relative flex justify-between">
+              {Array.from({ length: totalSteps }, (_, i) => (
+                <button
+                  key={i}
+                  className="group flex flex-col items-center"
+                  onClick={() => handleStepClick(i + 1)}
+                >
+                  {/* Step Circle */}
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300
+                      ${currentStep >= i + 1 
+                        ? 'bg-fire text-white shadow-lg shadow-fire/30' 
+                        : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                      }
+                      ${currentStep === i + 1 && 'ring-4 ring-fire/20'}
+                    `}
+                  >
+                    {currentStep > i + 1 ? (
+                      <Check className="w-6 h-6" />
+                    ) : (
+                      <span className="text-lg font-medium">{i + 1}</span>
+                    )}
+                  </div>
+                  
+                  {/* Step Label - Only show for current step */}
+                  {currentStep === i + 1 && (
+                    <div className="absolute top-16 left-1/2 transform -translate-x-1/2">
+                      <div className="px-4 py-2 rounded-lg text-sm font-medium bg-fire/10 text-fire shadow-lg whitespace-nowrap">
+                        {[
+                          "Project Setup",
+                          "Occupancy Classification",
+                          "Facility Overview",
+                          "Commodity Classification",
+                          "Fire Protection Systems",
+                          "Special Risks & Mitigation",
+                          "Final Summary"
+                        ][i]}
+              </div>
+            </div>
+          )}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Step Content */}
+          <div className="min-h-[400px]">
+            {renderStep()}
+          </div>
+          
+          {/* Navigation Buttons */}
+          <div className="flex items-center justify-between pt-6 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={prevStep}
+              disabled={currentStep === 1}
+              className="gap-2"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </Button>
+            {currentStep === totalSteps ? (
+              <Button type="submit" className="gap-2">
+                Create Project
+              </Button>
+            ) : (
+              <Button
+                type="button"
+              onClick={nextStep}
+                className="gap-2"
+            >
+              Next
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        </form>
+      </Card>
     </div>
   );
 };
 
-export default ProjectWizard; 
+export default ProjectWizard;
