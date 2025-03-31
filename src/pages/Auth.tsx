@@ -32,7 +32,7 @@ const Auth = () => {
         <div className="container mx-auto px-4">
           <Link to="/" className="flex items-center space-x-2">
             <div className="h-8 w-8 rounded-md bg-fire flex items-center justify-center">
-              <span className="font-bold text-white">FP</span>
+              <span className="font-bold text-white">FF</span>
             </div>
             <span className="font-bold text-lg">FireFly</span>
           </Link>
