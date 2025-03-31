@@ -45,7 +45,7 @@ const Auth = () => {
           <div className="flex flex-col md:flex-row gap-8 items-center">
             <div className="w-full md:w-1/2 lg:pr-12">
               <h1 className="text-3xl sm:text-4xl font-bold mb-4 animate-fade-in">
-                {isRegister ? "Join South Africa's Fire Plan Revolution" : "Welcome Back to FirePlan"}
+                {isRegister ? "Join South Africa's Fire Plan Revolution" : "Welcome Back to FireFly"}
               </h1>
               <p className="text-muted-foreground mb-6 animate-fade-in animate-delay-100">
                 {isRegister
