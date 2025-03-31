@@ -34,7 +34,7 @@ const Auth = () => {
             <div className="h-8 w-8 rounded-md bg-fire flex items-center justify-center">
               <span className="font-bold text-white">FP</span>
             </div>
-            <span className="font-bold text-lg">FirePlan</span>
+            <span className="font-bold text-lg">FireFly</span>
           </Link>
         </div>
       </header>
