@@ -12,304 +12,377 @@ import { Textarea } from '@/components/ui/textarea';
 import { useProjects } from '@/contexts/ProjectContext';
 import { saveAs } from 'file-saver';
 
+// Corresponds to report_types table
 interface ReportType {
   id: string;
   name: string;
   description: string;
 }
 
+// (Keep your existing reportTypes array as it matches the interface)
 const reportTypes: ReportType[] = [
-  {
-    id: "fire_risk_assessment",
-    name: "Fire Risk Assessment Report",
-    description: "Comprehensive evaluation of fire risks and safety measures"
-  },
-  {
-    id: "compliance_assessment",
-    name: "Fire Safety Compliance Assessment Report",
-    description: "Evaluate building design against regulations"
-  },
-  {
-    id: "plan_review",
-    name: "Building Plan Review Report",
-    description: "Ensure fire safety requirements are met in design plans"
-  },
-  {
-    id: "certificate_fitness",
-    name: "Certificate of Fitness Application Report",
-    description: "Support application for regulatory approval"
-  },
-  {
-    id: "rational_design",
-    name: "Rational Design Report",
-    description: "Justify alternative fire safety designs"
-  },
-  {
-    id: "compliance_audit",
-    name: "Compliance Audit Report",
-    description: "Assess existing buildings for regulatory compliance"
-  }
-];
+    {
+      id: "fire_risk_assessment",
+      name: "Fire Risk Assessment Report",
+      description: "Comprehensive evaluation of fire risks and safety measures"
+    },
+    {
+      id: "compliance_assessment",
+      name: "Fire Safety Compliance Assessment Report",
+      description: "Evaluate building design against regulations"
+    },
+    {
+      id: "plan_review",
+      name: "Building Plan Review Report",
+      description: "Ensure fire safety requirements are met in design plans"
+    },
+    {
+      id: "certificate_fitness",
+      name: "Certificate of Fitness Application Report",
+      description: "Support application for regulatory approval"
+    },
+    {
+      id: "rational_design",
+      name: "Rational Design Report",
+      description: "Justify alternative fire safety designs"
+    },
+    {
+      id: "compliance_audit",
+      name: "Compliance Audit Report",
+      description: "Assess existing buildings for regulatory compliance"
+    }
+  ];
 
-interface ProjectData {
-  reportType: string;
-  name: string;
-  client_name: string;
-  description: string;
-  start_date: string;
-  end_date: string;
-  status: string;
-  company_id: string;
-  company_name: string;
-  facility_process: string;
-  facility_location: {
+
+// Corresponds to facility_locations table
+interface FacilityLocation {
+    id?: number; // Optional: only present for existing records
+    project_id?: number; // Optional: only needed if managing relations explicitly
     town: string;
     province: string;
-  };
-  construction_year: number;
-  buildings: Array<{
+}
+
+// Corresponds to building_construction_materials table
+interface BuildingConstructionMaterials {
+    building_id?: number; // Optional: only needed if managing relations explicitly
+    brick: boolean;
+    steel: boolean;
+    concrete: boolean;
+    timber: boolean;
+    other_description: string | null; // Renamed from 'other', type TEXT -> string | null
+}
+
+// Corresponds to buildings table
+interface Building {
+    id?: number; // Optional: only present for existing records
+    project_id?: number; // Optional: only needed if managing relations explicitly
     name: string;
-    classification: string;
-    construction_materials: {
-      brick: boolean;
-      steel: boolean;
-      concrete: boolean;
-      timber: boolean;
-      other: string;
-    };
-    total_floor_area: number;
-    floor_plan: string;
-    cad_drawing: string;
-    sans_10400_t_table: string;
-    fire_load: {
-      commodities: Array<{
-        name: string;
-        category: string;
-        minimum_stacking_height: number;
-        storage_type: string;
-      }>;
-      total_timber_equivalent: number;
-    };
-    aerial_view: string;
-  }>;
-  zones: Array<{
+    classification: string | null; // Nullable
+    total_building_area: number | null; // Renamed from total_floor_area, nullable
+    cad_drawing: string | null; // Nullable
+    aerial_view: string | null; // Nullable
+    // Nested construction materials directly for convenience, maps to separate table
+    construction_materials: BuildingConstructionMaterials;
+    // Removed: floor_plan, sans_10400_t_table, fire_load
+}
+
+// Corresponds to expected_commodities table
+interface ExpectedCommodity {
+    id?: number; // Optional
+    project_id?: number; // Optional
     name: string;
-    photos: string[];
-  }>;
-  special_risks: Array<{
-    type: string;
+    category: string | null;
+    stacking_height: number | null; // Assuming meters
+    storage_type: string | null;
+}
+
+// Corresponds to zone_photos table
+interface ZonePhoto {
+    id?: number; // Optional
+    zone_id?: number; // Optional
+    photo_url: string;
+    description?: string | null; // Optional description added in SQL
+}
+
+// Corresponds to zones table
+interface Zone {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    name: string;
+    // Nested photos directly for convenience, maps to separate table
+    photos: ZonePhoto[]; // Updated structure
+}
+
+// Corresponds to special_risks table
+interface SpecialRisk {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    risk_type: string; // Renamed from 'type'
     location: string;
-    details: string;
-    photo: string;
-  }>;
-  storage_details: Array<{
-    commodity_type: string;
-    category: 'I' | 'II' | 'III' | 'IV';
-    stack_height: number;
-  }>;
-  divisional_separation: {
+    details: string | null; // Nullable
+    photo: string | null; // Nullable
+}
+
+// Corresponds to divisional_separations table (1-to-1 with project)
+interface DivisionalSeparation {
+    project_id?: number; // Optional
     fire_rated_walls: boolean;
     fire_rated_doors: boolean;
-    penetrations: boolean;
-    separation_plan: string;
-  };
-  fire_alarm: {
-    panel_layout: string;
-    sprinkler_zones: string[];
-    hydrant_locations: string[];
-  };
-  escape_routes: {
-    routes: Array<{
-      name: string;
-      travel_distance: number;
-      width: number;
-    }>;
-  };
-  emergency_staircases: Array<{
-    name: string;
-    width: number;
-    fire_rated: boolean;
-  }>;
-  signage: {
-    items: Array<{
-      type: string;
-      location: string;
-      photoluminescent: boolean;
-    }>;
-  };
-  emergency_lighting: {
-    zones: Array<{
-      name: string;
-      duration: number;
-      lux_level: number;
-    }>;
-  };
-  fire_hose_reels: Array<{
-    location: string;
-    hose_length: number;
-    coverage_radius: number;
-  }>;
-  fire_extinguishers: Array<{
-    type: string;
-    location: string;
-    capacity: number;
-  }>;
-  fire_hydrants: Array<{
-    location: string;
-    type: string;
-    flow_rate: number;
-  }>;
-  firewater: {
-    source: string;
-    capacity: number;
-    pressure: number;
-  };
-  fire_detection: {
-    type: string;
-    zones: number;
-    battery_backup: number;
-  };
-  smoke_ventilation: {
-    zones: Array<{
-      name: string;
-      area: number;
-      ventilation_rate: number;
-    }>;
-  };
-  electrical: {
-    main_supply: number;
-    backup_supply: number;
-    circuit_protection: string;
-  };
-  mandatory_actions: string[];
-  optional_actions: string[];
-  engineer_signoff: {
-    name: string;
-    ecsa_number: string;
-    signature: string;
-  };
-  occupancy_separation: {
-    type: string;
-    rating: number;
-  };
-  separation_requirements: {
-    minimum_distance: number;
-    required_rating: number;
-  };
-  automatic_fire_extinguishment: {
-    areas: Array<{
-      name: string;
-      commodity: string;
-      category: string;
-      storage_type: string;
-      max_stacking_height: number;
-      current_stacking_height: number;
-    }>;
-  };
+    details: string | null; // Added in SQL, replaced separation_plan, penetrations
 }
+
+// Corresponds to fire_alarm_panel table (1-to-1 with project)
+interface FireAlarmPanel {
+    project_id?: number; // Optional
+    panel_layout: string | null; // Nullable
+    panel_location: string | null; // Added in SQL
+    zone_description: string | null; // Added in SQL, replaced sprinkler_zones, hydrant_locations
+}
+
+// Corresponds to escape_routes table
+interface EscapeRoute {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    name: string;
+    travel_distance: number | null; // Nullable
+    width: number | null; // Nullable
+}
+
+// Corresponds to emergency_staircases table
+interface EmergencyStaircase {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    name: string;
+    width: number | null; // Nullable
+    fire_rated: boolean;
+}
+
+// Corresponds to signage_items table
+interface SignageItem {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    sign_type: string; // Renamed from 'type'
+    location: string;
+    photoluminescent: boolean;
+}
+
+// Corresponds to emergency_lighting_zones table
+interface EmergencyLightingZone {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    name: string;
+    duration: number | null; // Duration in minutes, nullable
+    lux_level: number | null; // Nullable
+}
+
+// Corresponds to fire_hose_reels table
+interface FireHoseReel {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    location: string;
+    hose_length: number | null; // Nullable
+    coverage_radius: number | null; // Nullable
+}
+
+// Corresponds to fire_extinguishers table
+interface FireExtinguisher {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    extinguisher_type: string; // Renamed from 'type'
+    location: string;
+    capacity: number | null; // Nullable
+    capacity_unit: string | null; // Added in SQL, nullable
+}
+
+// Corresponds to fire_hydrants table
+interface FireHydrant {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    location: string;
+    hydrant_type: string | null; // Renamed from 'type', nullable
+    flow_rate: number | null; // Nullable
+    flow_rate_unit: string | null; // Added in SQL, nullable
+}
+
+// Corresponds to firewater table (1-to-1 with project)
+interface Firewater {
+    project_id?: number; // Optional
+    source: string;
+    capacity: number | null; // Nullable
+    capacity_unit: string | null; // Added in SQL, nullable
+    pressure: number | null; // Nullable
+    pressure_unit: string | null; // Added in SQL, nullable
+}
+
+// Corresponds to fire_detection table (1-to-1 with project)
+interface FireDetection {
+    project_id?: number; // Optional
+    system_type: string; // Renamed from 'type'
+    number_of_zones: number | null; // Renamed from 'zones', nullable
+    battery_backup: number | null; // Duration in hours, nullable
+}
+
+// Corresponds to smoke_ventilation_zones table
+interface SmokeVentilationZone {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    name: string;
+    area: number | null; // Nullable
+    ventilation_rate: number | null; // Nullable
+    ventilation_rate_unit: string | null; // Added in SQL, nullable
+}
+
+// Corresponds to project_actions table (consolidated mandatory/optional)
+interface ProjectAction {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    action_type: 'mandatory' | 'optional';
+    action_description: string;
+    priority?: number | null; // Optional field added in SQL
+    status?: 'outstanding' | 'in_progress' | 'completed' | 'waived'; // Optional field added in SQL
+}
+
+// Corresponds to engineer_signoffs table (1-to-1 with project)
+interface EngineerSignoff {
+    project_id?: number; // Optional
+    engineer_name: string; // Renamed from 'name'
+    ecsa_number: string;
+    signature_url: string | null; // Renamed from 'signature', nullable
+    signoff_date?: Date; // Added in SQL, use Date type, optional as DB might set default
+}
+
+// Corresponds to occupancy_separations table (1-to-1 with project)
+interface OccupancySeparation {
+    project_id?: number; // Optional
+    separation_type: string; // Renamed from 'type'
+    required_rating: number | null; // Renamed from 'rating', nullable (rating in minutes)
+}
+
+// Corresponds to automatic_fire_extinguishment_areas table
+interface AutomaticFireExtinguishmentArea {
+    id?: number; // Optional
+    project_id?: number; // Optional
+    name: string;
+    system_type: string | null; // Added in SQL, nullable
+    commodity: string | null; // Nullable
+    category: string | null; // Nullable
+    storage_type: string | null; // Nullable
+    max_design_stacking_height: number | null; // Renamed from max_stacking_height, nullable
+    current_stacking_height: number | null; // Nullable
+}
+
+// --- Main Project Data Interface ---
+// Corresponds largely to the projects table, embedding related data arrays/objects
+interface ProjectData {
+    id?: number; // Optional: from projects table
+    reportType: string; // from projects.report_type
+    name: string; // Assuming a name for the project itself is needed - ADD to SQL projects.name?
+    clientName: string; // from projects.client_name
+    description: string | null; // Project description - ADD to SQL projects.description? nullable
+    // start_date, end_date removed - not in refined SQL
+    status: 'active' | 'completed' | 'archived' | 'pending'; // from projects.status
+    // company_id removed - not in refined SQL
+    companyName: string | null; // from projects.company_name, nullable
+    facility_process: string | null; // from projects.facility_process, nullable
+    construction_year: number | null; // from projects.construction_year, nullable
+    created_at?: Date; // Optional: from projects.created_at
+    updated_at?: Date; // Optional: from projects.updated_at
+
+    // --- Related Data (Arrays for one-to-many, Objects for one-to-one) ---
+    facility_locations: FacilityLocation[]; // Changed from single object
+    buildings: Building[];
+    expected_commodities: ExpectedCommodity[]; // Replaces 'storage_details'
+    zones: Zone[];
+    special_risks: SpecialRisk[];
+    divisional_separation: DivisionalSeparation | null; // Can be null if not applicable/entered
+    fire_alarm_panel: FireAlarmPanel | null; // Renamed, Can be null
+    escape_routes: EscapeRoute[]; // Changed from nested structure
+    emergency_staircases: EmergencyStaircase[];
+    signage_items: SignageItem[]; // Renamed from signage.items
+    emergency_lighting_zones: EmergencyLightingZone[]; // Renamed from emergency_lighting.zones
+    fire_hose_reels: FireHoseReel[];
+    fire_extinguishers: FireExtinguisher[];
+    fire_hydrants: FireHydrant[];
+    firewater: Firewater | null; // Can be null
+    fire_detection: FireDetection | null; // Can be null
+    smoke_ventilation_zones: SmokeVentilationZone[]; // Renamed from smoke_ventilation.zones
+    project_actions: ProjectAction[]; // Replaces mandatory/optional actions
+    engineer_signoff: EngineerSignoff | null; // Can be null
+    occupancy_separation: OccupancySeparation | null; // Renamed, can be null
+    automatic_fire_extinguishment_areas: AutomaticFireExtinguishmentArea[]; // Renamed from automatic_fire_extinguishment.areas
+
+    // Removed: storage_details, electrical, separation_requirements
+}
+
+// --- Updated Component ---
+
+// Placeholder hooks - replace with your actual implementations
+const useUser = () => ({ userDetails: { company: 'some-company-id' } });
+const useProjects = () => ({ refreshProjects: () => console.log("Refreshing projects...") });
+
 
 const ProjectWizard = () => {
   const navigate = useNavigate();
   const { userDetails } = useUser();
   const { refreshProjects } = useProjects();
   const [currentStep, setCurrentStep] = React.useState(1);
-  const totalSteps = 7;
+  const totalSteps = 7; // Adjust as needed
   const [loading, setLoading] = useState(false);
+  // State for UI control - keeping these as they seem UI-specific
   const [expandedBuildings, setExpandedBuildings] = useState<number[]>([]);
   const [selectedSansDoc, setSelectedSansDoc] = useState<string>("10400-T");
   const [showSansSelector, setShowSansSelector] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
-    zones: true,
-    storage_details: true,
-    sprinkler_zones: true,
-    hydrant_locations: true,
-    emergency_lighting_zones: true,
-    door_rotation_diagrams: true,
-    mandatory_actions: true,
-    optional_actions: true
+    // Update keys if section names changed, otherwise keep for UI state
+     zones: true,
+     expected_commodities: true, // Changed from storage_details
+     // sprinkler_zones is removed from fire_alarm
+     // hydrant_locations is removed from fire_alarm
+     emergency_lighting_zones: true, // Key matches new top-level array name
+     // door_rotation_diagrams seems UI specific, maybe relates to escape routes or buildings? Keep for now.
+     door_rotation_diagrams: true,
+     project_actions: true, // Changed from mandatory/optional actions
   });
 
+  // Initialize formData according to the updated ProjectData interface
   const [formData, setFormData] = React.useState<ProjectData>({
-    reportType: "",
-    name: '',
-    client_name: '',
-    description: '',
-    start_date: '',
-    end_date: '',
-    status: 'active',
-    company_id: userDetails?.company || '',
-    company_name: '',
-    facility_process: '',
-    facility_location: {
-      town: '',
-      province: ''
-    },
-    construction_year: 0,
+    reportType: "", // Will be selected from reportTypes
+    name: '', // Project name
+    clientName: '',
+    description: null,
+    status: 'active', // Default status
+    // company_id removed
+    companyName: '', // Set based on userDetails or selection later?
+    facility_process: null,
+    construction_year: null,
+    // Initialize arrays and nullable objects
+    facility_locations: [], // Was facility_location object
     buildings: [],
+    expected_commodities: [], // Was storage_details
     zones: [],
     special_risks: [],
-    storage_details: [],
-    divisional_separation: {
-      fire_rated_walls: false,
-      fire_rated_doors: false,
-      penetrations: false,
-      separation_plan: '',
-    },
-    fire_alarm: {
-      panel_layout: '',
-      sprinkler_zones: [],
-      hydrant_locations: [],
-    },
-    escape_routes: {
-      routes: [],
-    },
+    divisional_separation: null, // Initialize as null
+    fire_alarm_panel: null, // Initialize as null
+    escape_routes: [], // Was nested object
     emergency_staircases: [],
-    signage: {
-      items: [],
-    },
-    emergency_lighting: {
-      zones: [],
-    },
+    signage_items: [], // Was nested signage.items
+    emergency_lighting_zones: [], // Was nested emergency_lighting.zones
     fire_hose_reels: [],
     fire_extinguishers: [],
     fire_hydrants: [],
-    firewater: {
-      source: '',
-      capacity: 0,
-      pressure: 0,
-    },
-    fire_detection: {
-      type: '',
-      zones: 0,
-      battery_backup: 0,
-    },
-    smoke_ventilation: {
-      zones: [],
-    },
-    electrical: {
-      main_supply: 0,
-      backup_supply: 0,
-      circuit_protection: '',
-    },
-    mandatory_actions: [],
-    optional_actions: [],
-    engineer_signoff: {
-      name: '',
-      ecsa_number: '',
-      signature: '',
-    },
-    occupancy_separation: {
-      type: '',
-      rating: 0
-    },
-    separation_requirements: {
-      minimum_distance: 0,
-      required_rating: 0
-    },
-    automatic_fire_extinguishment: {
-      areas: []
-    },
+    firewater: null, // Initialize as null
+    fire_detection: null, // Initialize as null
+    smoke_ventilation_zones: [], // Was nested smoke_ventilation.zones
+    project_actions: [], // Replaces mandatory_actions/optional_actions arrays
+    engineer_signoff: null, // Initialize as null
+    occupancy_separation: null, // Initialize as null
+    automatic_fire_extinguishment_areas: [], // Was nested automatic_fire_extinguishment.areas
   });
+
+  // --- Rest of your component logic (handlers, JSX, etc.) ---
+  // Remember to update your input field names/bindings (`onChange` handlers, etc.)
+  // to match the new `formData` structure and field names (e.g., use `clientName` instead of `client_name`)
+
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => {
