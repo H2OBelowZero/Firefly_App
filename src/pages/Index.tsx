@@ -193,7 +193,7 @@ const Index = () => {
                 <div className="h-8 w-8 rounded-md bg-fire flex items-center justify-center">
                   <span className="font-bold text-white">FP</span>
                 </div>
-                <span className="font-bold text-lg">FirePlan</span>
+                <span className="font-bold text-lg">FireFly</span>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
                 Helping fire engineers create SANS-compliant fire plans with ease.
@@ -229,7 +229,7 @@ const Index = () => {
           </div>
           <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-sm text-muted-foreground">
-              © 2023 FirePlan. All rights reserved.
+              © 2023 FireFly. All rights reserved.
             </p>
             <div className="flex space-x-4 mt-4 md:mt-0">
               <a href="#" className="text-muted-foreground hover:text-foreground">

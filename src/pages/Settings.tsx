@@ -10,11 +10,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/contexts/ThemeContext';
 
 const Settings = () => {
-  const { userDetails, setUserDetails } = useUser();
+  const { profile, setProfile } = useUser();
   const [loading, setLoading] = React.useState(false);
   const [formData, setFormData] = React.useState({
-    full_name: userDetails?.full_name || '',
-    email: userDetails?.email || '',
+    full_name: profile?.full_name || '',
+    email: profile?.email || '',
     notifications_enabled: true,
     dark_mode: false
   });
@@ -33,12 +33,12 @@ const Settings = () => {
           notifications_enabled: formData.notifications_enabled,
           dark_mode: formData.dark_mode
         })
-        .eq('id', userDetails?.id);
+        .eq('id', profile?.id);
 
       if (error) throw error;
 
-      setUserDetails({
-        ...userDetails,
+      setProfile({
+        ...profile,
         ...formData
       });
 

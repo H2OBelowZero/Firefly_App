@@ -11,400 +11,276 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useProjects } from '@/contexts/ProjectContext';
 import { saveAs } from 'file-saver';
+import { Building as BuildingType } from '@/types/database.types';
+import { Database } from '@/types/database.types';
 
-// Corresponds to report_types table
 interface ReportType {
   id: string;
   name: string;
   description: string;
 }
 
-// (Keep your existing reportTypes array as it matches the interface)
 const reportTypes: ReportType[] = [
-    {
-      id: "fire_risk_assessment",
-      name: "Fire Risk Assessment Report",
-      description: "Comprehensive evaluation of fire risks and safety measures"
-    },
-    {
-      id: "compliance_assessment",
-      name: "Fire Safety Compliance Assessment Report",
-      description: "Evaluate building design against regulations"
-    },
-    {
-      id: "plan_review",
-      name: "Building Plan Review Report",
-      description: "Ensure fire safety requirements are met in design plans"
-    },
-    {
-      id: "certificate_fitness",
-      name: "Certificate of Fitness Application Report",
-      description: "Support application for regulatory approval"
-    },
-    {
-      id: "rational_design",
-      name: "Rational Design Report",
-      description: "Justify alternative fire safety designs"
-    },
-    {
-      id: "compliance_audit",
-      name: "Compliance Audit Report",
-      description: "Assess existing buildings for regulatory compliance"
-    }
-  ];
+  {
+    id: "fire_risk_assessment",
+    name: "Fire Risk Assessment Report",
+    description: "Comprehensive evaluation of fire risks and safety measures"
+  },
+  {
+    id: "compliance_assessment",
+    name: "Fire Safety Compliance Assessment Report",
+    description: "Evaluate building design against regulations"
+  },
+  {
+    id: "plan_review",
+    name: "Building Plan Review Report",
+    description: "Ensure fire safety requirements are met in design plans"
+  },
+  {
+    id: "certificate_fitness",
+    name: "Certificate of Fitness Application Report",
+    description: "Support application for regulatory approval"
+  },
+  {
+    id: "rational_design",
+    name: "Rational Design Report",
+    description: "Justify alternative fire safety designs"
+  },
+  {
+    id: "compliance_audit",
+    name: "Compliance Audit Report",
+    description: "Assess existing buildings for regulatory compliance"
+  }
+];
 
-
-// Corresponds to facility_locations table
-interface FacilityLocation {
-    id?: number; // Optional: only present for existing records
-    project_id?: number; // Optional: only needed if managing relations explicitly
-    town: string;
-    province: string;
-}
-
-// Corresponds to building_construction_materials table
-interface BuildingConstructionMaterials {
-    building_id?: number; // Optional: only needed if managing relations explicitly
+type Building = Database['public']['Tables']['buildings']['Row'] & {
+  construction_materials: {
     brick: boolean;
     steel: boolean;
     concrete: boolean;
     timber: boolean;
-    other_description: string | null; // Renamed from 'other', type TEXT -> string | null
-}
+    other: string | null;
+  };
+};
 
-// Corresponds to buildings table
-interface Building {
-    id?: number; // Optional: only present for existing records
-    project_id?: number; // Optional: only needed if managing relations explicitly
+type ProjectData = {
+  reportType: string;
+  client_name: string;
+  company_name: string;
+  facility_process: string;
+  construction_year: number;
+  status: string;
+  facility_location: {
+    town: string;
+    province: string;
+  };
+  buildings: Building[];
+  expected_commodities: Array<{
     name: string;
-    classification: string | null; // Nullable
-    total_building_area: number | null; // Renamed from total_floor_area, nullable
-    cad_drawing: string | null; // Nullable
-    aerial_view: string | null; // Nullable
-    // Nested construction materials directly for convenience, maps to separate table
-    construction_materials: BuildingConstructionMaterials;
-    // Removed: floor_plan, sans_10400_t_table, fire_load
-}
-
-// Corresponds to expected_commodities table
-interface ExpectedCommodity {
-    id?: number; // Optional
-    project_id?: number; // Optional
+    category: string;
+    stacking_height: number;
+    storage_type: string;
+  }>;
+  zones: Array<{
     name: string;
-    category: string | null;
-    stacking_height: number | null; // Assuming meters
-    storage_type: string | null;
-}
-
-// Corresponds to zone_photos table
-interface ZonePhoto {
-    id?: number; // Optional
-    zone_id?: number; // Optional
-    photo_url: string;
-    description?: string | null; // Optional description added in SQL
-}
-
-// Corresponds to zones table
-interface Zone {
-    id?: number; // Optional
-    project_id?: number; // Optional
-    name: string;
-    // Nested photos directly for convenience, maps to separate table
-    photos: ZonePhoto[]; // Updated structure
-}
-
-// Corresponds to special_risks table
-interface SpecialRisk {
-    id?: number; // Optional
-    project_id?: number; // Optional
-    risk_type: string; // Renamed from 'type'
+    classification: string;
+    area: number;
+    occupancy_type: string;
+    fire_load: any;
+    photos?: string[];
+  }>;
+  special_risks: Array<{
+    risk_type: string;
     location: string;
-    details: string | null; // Nullable
-    photo: string | null; // Nullable
-}
-
-// Corresponds to divisional_separations table (1-to-1 with project)
-interface DivisionalSeparation {
-    project_id?: number; // Optional
+    details: string;
+    photo_url?: string;
+  }>;
+  fire_protection_systems: Array<{
+    type: string;
+    description: string;
+    coverage: string;
+    maintenance_status: string;
+  }>;
+  emergency_procedures: Array<{
+    type: string;
+    description: string;
+    responsible_person: string;
+    contact_number: string;
+  }>;
+  automatic_fire_extinguishment_areas: Array<{
+    name: string;
+    commodity_name: string;
+    maximum_stacking_height: number;
+  }>;
+  occupancy_separations: {
+    separation_type: string;
+    rating: number;
+  };
+  divisional_separations: {
     fire_rated_walls: boolean;
     fire_rated_doors: boolean;
-    details: string | null; // Added in SQL, replaced separation_plan, penetrations
-}
-
-// Corresponds to fire_alarm_panel table (1-to-1 with project)
-interface FireAlarmPanel {
-    project_id?: number; // Optional
-    panel_layout: string | null; // Nullable
-    panel_location: string | null; // Added in SQL
-    zone_description: string | null; // Added in SQL, replaced sprinkler_zones, hydrant_locations
-}
-
-// Corresponds to escape_routes table
-interface EscapeRoute {
-    id?: number; // Optional
-    project_id?: number; // Optional
+  };
+  escape_routes: Array<{
     name: string;
-    travel_distance: number | null; // Nullable
-    width: number | null; // Nullable
-}
-
-// Corresponds to emergency_staircases table
-interface EmergencyStaircase {
-    id?: number; // Optional
-    project_id?: number; // Optional
+    travel_distance: number;
+    width: number;
+  }>;
+  emergency_staircases: Array<{
     name: string;
-    width: number | null; // Nullable
+    width: number;
+    fire_rating: number;
     fire_rated: boolean;
-}
-
-// Corresponds to signage_items table
-interface SignageItem {
-    id?: number; // Optional
-    project_id?: number; // Optional
-    sign_type: string; // Renamed from 'type'
+  }>;
+  signage_items: Array<{
+    sign_type: string;
     location: string;
-    photoluminescent: boolean;
-}
-
-// Corresponds to emergency_lighting_zones table
-interface EmergencyLightingZone {
-    id?: number; // Optional
-    project_id?: number; // Optional
+    photoluminescent: string;
+  }>;
+  emergency_lighting_zones: Array<{
     name: string;
-    duration: number | null; // Duration in minutes, nullable
-    lux_level: number | null; // Nullable
-}
-
-// Corresponds to fire_hose_reels table
-interface FireHoseReel {
-    id?: number; // Optional
-    project_id?: number; // Optional
+    duration: number;
+    lux_level: number;
+  }>;
+  fire_hose_reels: Array<{
     location: string;
-    hose_length: number | null; // Nullable
-    coverage_radius: number | null; // Nullable
-}
-
-// Corresponds to fire_extinguishers table
-interface FireExtinguisher {
-    id?: number; // Optional
-    project_id?: number; // Optional
-    extinguisher_type: string; // Renamed from 'type'
+    hose_length: number;
+    coverage_radius: number;
+  }>;
+  fire_extinguishers: Array<{
+    extinguisher_type: string;
     location: string;
-    capacity: number | null; // Nullable
-    capacity_unit: string | null; // Added in SQL, nullable
-}
-
-// Corresponds to fire_hydrants table
-interface FireHydrant {
-    id?: number; // Optional
-    project_id?: number; // Optional
+    capacity: number;
+  }>;
+  fire_hydrants: Array<{
     location: string;
-    hydrant_type: string | null; // Renamed from 'type', nullable
-    flow_rate: number | null; // Nullable
-    flow_rate_unit: string | null; // Added in SQL, nullable
-}
-
-// Corresponds to firewater table (1-to-1 with project)
-interface Firewater {
-    project_id?: number; // Optional
+    hydrant_type: string;
+    flow_rate: number;
+  }>;
+  firewater: {
     source: string;
-    capacity: number | null; // Nullable
-    capacity_unit: string | null; // Added in SQL, nullable
-    pressure: number | null; // Nullable
-    pressure_unit: string | null; // Added in SQL, nullable
-}
-
-// Corresponds to fire_detection table (1-to-1 with project)
-interface FireDetection {
-    project_id?: number; // Optional
-    system_type: string; // Renamed from 'type'
-    number_of_zones: number | null; // Renamed from 'zones', nullable
-    battery_backup: number | null; // Duration in hours, nullable
-}
-
-// Corresponds to smoke_ventilation_zones table
-interface SmokeVentilationZone {
-    id?: number; // Optional
-    project_id?: number; // Optional
+    capacity: number;
+    pressure: number;
+  };
+  fire_detection: {
+    system_type: string;
+    number_of_zones: number;
+    battery_backup: number;
+  };
+  fire_alarm_panel: {
+    panel_layout: string;
+    zone_name: string;
+  };
+  smoke_ventilation_zones: Array<{
     name: string;
-    area: number | null; // Nullable
-    ventilation_rate: number | null; // Nullable
-    ventilation_rate_unit: string | null; // Added in SQL, nullable
-}
-
-// Corresponds to project_actions table (consolidated mandatory/optional)
-interface ProjectAction {
-    id?: number; // Optional
-    project_id?: number; // Optional
-    action_type: 'mandatory' | 'optional';
-    action_description: string;
-    priority?: number | null; // Optional field added in SQL
-    status?: 'outstanding' | 'in_progress' | 'completed' | 'waived'; // Optional field added in SQL
-}
-
-// Corresponds to engineer_signoffs table (1-to-1 with project)
-interface EngineerSignoff {
-    project_id?: number; // Optional
-    engineer_name: string; // Renamed from 'name'
-    ecsa_number: string;
-    signature_url: string | null; // Renamed from 'signature', nullable
-    signoff_date?: Date; // Added in SQL, use Date type, optional as DB might set default
-}
-
-// Corresponds to occupancy_separations table (1-to-1 with project)
-interface OccupancySeparation {
-    project_id?: number; // Optional
-    separation_type: string; // Renamed from 'type'
-    required_rating: number | null; // Renamed from 'rating', nullable (rating in minutes)
-}
-
-// Corresponds to automatic_fire_extinguishment_areas table
-interface AutomaticFireExtinguishmentArea {
-    id?: number; // Optional
-    project_id?: number; // Optional
-    name: string;
-    system_type: string | null; // Added in SQL, nullable
-    commodity: string | null; // Nullable
-    category: string | null; // Nullable
-    storage_type: string | null; // Nullable
-    max_design_stacking_height: number | null; // Renamed from max_stacking_height, nullable
-    current_stacking_height: number | null; // Nullable
-}
-
-// --- Main Project Data Interface ---
-// Corresponds largely to the projects table, embedding related data arrays/objects
-interface ProjectData {
-    id?: number; // Optional: from projects table
-    reportType: string; // from projects.report_type
-    name: string; // Assuming a name for the project itself is needed - ADD to SQL projects.name?
-    clientName: string; // from projects.client_name
-    description: string | null; // Project description - ADD to SQL projects.description? nullable
-    // start_date, end_date removed - not in refined SQL
-    status: 'active' | 'completed' | 'archived' | 'pending'; // from projects.status
-    // company_id removed - not in refined SQL
-    companyName: string | null; // from projects.company_name, nullable
-    facility_process: string | null; // from projects.facility_process, nullable
-    construction_year: number | null; // from projects.construction_year, nullable
-    created_at?: Date; // Optional: from projects.created_at
-    updated_at?: Date; // Optional: from projects.updated_at
-
-    // --- Related Data (Arrays for one-to-many, Objects for one-to-one) ---
-    facility_locations: FacilityLocation[]; // Changed from single object
-    buildings: Building[];
-    expected_commodities: ExpectedCommodity[]; // Replaces 'storage_details'
-    zones: Zone[];
-    special_risks: SpecialRisk[];
-    divisional_separation: DivisionalSeparation | null; // Can be null if not applicable/entered
-    fire_alarm_panel: FireAlarmPanel | null; // Renamed, Can be null
-    escape_routes: EscapeRoute[]; // Changed from nested structure
-    emergency_staircases: EmergencyStaircase[];
-    signage_items: SignageItem[]; // Renamed from signage.items
-    emergency_lighting_zones: EmergencyLightingZone[]; // Renamed from emergency_lighting.zones
-    fire_hose_reels: FireHoseReel[];
-    fire_extinguishers: FireExtinguisher[];
-    fire_hydrants: FireHydrant[];
-    firewater: Firewater | null; // Can be null
-    fire_detection: FireDetection | null; // Can be null
-    smoke_ventilation_zones: SmokeVentilationZone[]; // Renamed from smoke_ventilation.zones
-    project_actions: ProjectAction[]; // Replaces mandatory/optional actions
-    engineer_signoff: EngineerSignoff | null; // Can be null
-    occupancy_separation: OccupancySeparation | null; // Renamed, can be null
-    automatic_fire_extinguishment_areas: AutomaticFireExtinguishmentArea[]; // Renamed from automatic_fire_extinguishment.areas
-
-    // Removed: storage_details, electrical, separation_requirements
-}
-
-// --- Updated Component ---
-
-// Placeholder hooks - replace with your actual implementations
-const useUser = () => ({ userDetails: { company: 'some-company-id' } });
-const useProjects = () => ({ refreshProjects: () => console.log("Refreshing projects...") });
-
+    area: number;
+    ventilation_rate: number;
+  }>;
+  recommendations: string;
+  conclusion: string;
+};
 
 const ProjectWizard = () => {
   const navigate = useNavigate();
-  const { userDetails } = useUser();
+  const { user } = useUser();
   const { refreshProjects } = useProjects();
-  const [currentStep, setCurrentStep] = React.useState(1);
-  const totalSteps = 7; // Adjust as needed
+  const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  // State for UI control - keeping these as they seem UI-specific
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [expandedBuildings, setExpandedBuildings] = useState<number[]>([]);
   const [selectedSansDoc, setSelectedSansDoc] = useState<string>("10400-T");
   const [showSansSelector, setShowSansSelector] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
-    // Update keys if section names changed, otherwise keep for UI state
-     zones: true,
-     expected_commodities: true, // Changed from storage_details
-     // sprinkler_zones is removed from fire_alarm
-     // hydrant_locations is removed from fire_alarm
-     emergency_lighting_zones: true, // Key matches new top-level array name
-     // door_rotation_diagrams seems UI specific, maybe relates to escape routes or buildings? Keep for now.
-     door_rotation_diagrams: true,
-     project_actions: true, // Changed from mandatory/optional actions
+    zones: true,
+    storage_details: true,
+    sprinkler_zones: true,
+    hydrant_locations: true,
+    emergency_lighting_zones: true,
+    door_rotation_diagrams: true,
+    mandatory_actions: true,
+    optional_actions: true
   });
 
-  // Initialize formData according to the updated ProjectData interface
-  const [formData, setFormData] = React.useState<ProjectData>({
-    reportType: "", // Will be selected from reportTypes
-    name: '', // Project name
-    clientName: '',
-    description: null,
-    status: 'active', // Default status
-    // company_id removed
-    companyName: '', // Set based on userDetails or selection later?
-    facility_process: null,
-    construction_year: null,
-    // Initialize arrays and nullable objects
-    facility_locations: [], // Was facility_location object
+  const [formData, setFormData] = useState<ProjectData>({
+    reportType: "",
+    client_name: '',
+    company_name: '',
+    facility_process: '',
+    construction_year: 0,
+    status: 'active',
+    facility_location: {
+      town: '',
+      province: ''
+    },
     buildings: [],
-    expected_commodities: [], // Was storage_details
+    expected_commodities: [],
     zones: [],
     special_risks: [],
-    divisional_separation: null, // Initialize as null
-    fire_alarm_panel: null, // Initialize as null
-    escape_routes: [], // Was nested object
+    fire_protection_systems: [],
+    emergency_procedures: [],
+    automatic_fire_extinguishment_areas: [],
+    occupancy_separations: {
+      separation_type: '',
+      rating: 0,
+    },
+    divisional_separations: {
+      fire_rated_walls: false,
+      fire_rated_doors: false,
+    },
+    escape_routes: [],
     emergency_staircases: [],
-    signage_items: [], // Was nested signage.items
-    emergency_lighting_zones: [], // Was nested emergency_lighting.zones
+    signage_items: [],
+    emergency_lighting_zones: [],
     fire_hose_reels: [],
     fire_extinguishers: [],
     fire_hydrants: [],
-    firewater: null, // Initialize as null
-    fire_detection: null, // Initialize as null
-    smoke_ventilation_zones: [], // Was nested smoke_ventilation.zones
-    project_actions: [], // Replaces mandatory_actions/optional_actions arrays
-    engineer_signoff: null, // Initialize as null
-    occupancy_separation: null, // Initialize as null
-    automatic_fire_extinguishment_areas: [], // Was nested automatic_fire_extinguishment.areas
+    firewater: {
+      source: '',
+      capacity: 0,
+      pressure: 0
+    },
+    fire_detection: {
+      system_type: '',
+      number_of_zones: 0,
+      battery_backup: 0
+    },
+    fire_alarm_panel: {
+      panel_layout: '',
+      zone_name: ''
+    },
+    smoke_ventilation_zones: [],
+    recommendations: '',
+    conclusion: ''
   });
 
-  // --- Rest of your component logic (handlers, JSX, etc.) ---
-  // Remember to update your input field names/bindings (`onChange` handlers, etc.)
-  // to match the new `formData` structure and field names (e.g., use `clientName` instead of `client_name`)
-
-
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => {
-      if (field.includes('.')) {
-        // Handle nested updates (e.g., 'fire_alarm.panel_layout')
-        const [parent, child] = field.split('.');
-        const parentObj = prev[parent as keyof ProjectData] as Record<string, any>;
-        return {
+    if (currentStep === 1 && field.startsWith('buildings.')) {
+      // Parse the field path to get the building index and field name
+      const [_, index, fieldName] = field.split('.');
+      const buildingIndex = parseInt(index);
+      
+      // Update the form data
+      setFormData(prev => ({
       ...prev,
-          [parent]: {
-            ...parentObj,
-            [child]: value
-          }
-        };
+        buildings: prev.buildings.map((building, i) => 
+          i === buildingIndex ? { ...building, [fieldName]: value } : building
+        )
+      }));
+    } else if (field === 'facility_location.town' || field === 'facility_location.province') {
+      // Handle facility location updates
+      const [_, locationField] = field.split('.');
+      setFormData(prev => ({
+        ...prev,
+        facility_location: {
+          ...prev.facility_location,
+          [locationField]: value
+        }
+      }));
       } else {
-        // Handle direct updates
-        return {
+      setFormData(prev => ({
           ...prev,
           [field]: value
-        };
+      }));
       }
-    });
   };
 
   const handleArrayChange = (field: string, index: number, value: any) => {
@@ -414,11 +290,144 @@ const ProjectWizard = () => {
     }));
   };
 
-  const handleArrayAdd = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: [...prev[field], value]
-    }));
+  const handleArrayAdd = async (field: string, value: any) => {
+    // First update the form data
+    setFormData(prev => {
+      const currentArray = prev[field as keyof ProjectData];
+      if (Array.isArray(currentArray)) {
+        return {
+          ...prev,
+          [field]: [...currentArray, value]
+        };
+      }
+      return prev;
+    });
+
+    // Only attempt to save building if we have a project ID and we're adding a building
+    if (projectId && field === 'buildings') {
+      try {
+        // First, create the building record
+        const { data: buildingData, error: buildingError } = await supabase
+          .from('buildings')
+          .insert({
+            project_id: projectId,
+            name: value.name,
+            classification: value.classification,
+            total_building_area: value.total_building_area,
+            cad_drawing: value.cad_drawing,
+            aerial_view: value.aerial_view
+          })
+          .select()
+          .single();
+
+        if (buildingError) {
+          console.error('Error creating building:', buildingError);
+          throw buildingError;
+        }
+
+        // Then create the construction materials record
+        if (buildingData && value.construction_materials) {
+          const { error: materialsError } = await supabase
+            .from('building_construction_materials')
+            .insert({
+              building_id: buildingData.id,
+              brick: value.construction_materials.brick,
+              steel: value.construction_materials.steel,
+              concrete: value.construction_materials.concrete,
+              timber: value.construction_materials.timber,
+              other: value.construction_materials.other
+            });
+
+          if (materialsError) {
+            console.error('Error creating construction materials:', materialsError);
+            throw materialsError;
+          }
+        }
+
+        // Update the form data with the building ID
+        setFormData(prev => {
+          const currentArray = prev[field as keyof ProjectData];
+          if (Array.isArray(currentArray)) {
+            const updatedArray = [...currentArray];
+            const lastIndex = updatedArray.length - 1;
+            updatedArray[lastIndex] = {
+              ...updatedArray[lastIndex],
+              id: buildingData.id
+            };
+            return {
+              ...prev,
+              [field]: updatedArray
+            };
+          }
+          return prev;
+        });
+
+        toast.success('Building added successfully');
+      } catch (error) {
+        console.error('Error adding building:', error);
+        toast.error('Failed to add building. Please try again.');
+        // Revert the form data if the save failed
+        setFormData(prev => {
+          const currentArray = prev[field as keyof ProjectData];
+          if (Array.isArray(currentArray)) {
+            return {
+              ...prev,
+              [field]: currentArray.slice(0, -1)
+            };
+          }
+          return prev;
+        });
+      }
+    }
+  };
+
+  // Add a new function to handle building updates in step 2
+  const handleBuildingUpdate = async (index: number, updatedBuilding: Building) => {
+    try {
+      // First update the building in the database
+      const { data: buildingData, error: buildingError } = await supabase
+        .from('buildings')
+        .update({
+          name: updatedBuilding.name,
+          classification: updatedBuilding.classification,
+          total_building_area: updatedBuilding.total_building_area,
+          cad_drawing: updatedBuilding.cad_drawing,
+          aerial_view: updatedBuilding.aerial_view
+        })
+        .eq('id', updatedBuilding.id)
+        .select()
+        .single();
+
+      if (buildingError) throw buildingError;
+
+      // Then update the construction materials
+      const { error: materialsError } = await supabase
+        .from('building_construction_materials')
+        .upsert({
+          building_id: updatedBuilding.id,
+          brick: updatedBuilding.construction_materials.brick,
+          steel: updatedBuilding.construction_materials.steel,
+          concrete: updatedBuilding.construction_materials.concrete,
+          timber: updatedBuilding.construction_materials.timber,
+          other: updatedBuilding.construction_materials.other
+        })
+        .eq('building_id', updatedBuilding.id);
+
+      if (materialsError) throw materialsError;
+
+      // Update the form data with the updated building
+      setFormData(prev => ({
+        ...prev,
+        buildings: prev.buildings.map((building, i) => 
+          i === index ? updatedBuilding : building
+        )
+      }));
+
+      toast.success('Building updated successfully');
+    } catch (error) {
+      console.error('Error updating building:', error);
+      toast.error('Failed to update building. Please try again.');
+    }
   };
 
   const handleArrayRemove = (field: string, index: number) => {
@@ -429,12 +438,32 @@ const ProjectWizard = () => {
   };
 
   const handleStepClick = (stepNumber: number) => {
+    if (stepNumber <= 7) { // Changed from steps.length to 7
     setCurrentStep(stepNumber);
+    }
   };
 
-  const nextStep = () => {
-    if (currentStep < totalSteps) {
+  const steps = [
+    { id: 1, name: 'Project Setup' },
+    { id: 2, name: 'Occupancy Classification' },
+    { id: 3, name: 'Facility Overview' },
+    { id: 4, name: 'Commodity Classification' },
+    { id: 5, name: 'Special Risks' },
+    { id: 6, name: 'Fire Protection Systems' },
+    { id: 7, name: 'Final Summary and Recommendations' }
+  ];
+
+  const nextStep = async () => {
+    try {
+      // Save draft before moving to next step
+      await handleSaveDraft();
+      
+      if (currentStep < 7) { // Changed from steps.length - 1 to 7
       setCurrentStep(currentStep + 1);
+      }
+    } catch (error) {
+      console.error('Error in nextStep:', error);
+      toast.error('Failed to save draft. Please try again.');
     }
   };
 
@@ -446,13 +475,547 @@ const ProjectWizard = () => {
 
   const handleSaveDraft = async () => {
     try {
-      setLoading(true);
-      // Add your save draft logic here
-      toast.success('Draft saved successfully');
+      if (!projectId) {
+        // Create new project
+        const { data: newProject, error: projectError } = await supabase
+          .from('projects')
+          .insert({
+            report_type: formData.reportType,
+            client_name: formData.client_name,
+            company_name: formData.company_name,
+            facility_process: formData.facility_process,
+            construction_year: formData.construction_year,
+            status: 'draft'
+          })
+          .select()
+          .single();
+
+        if (projectError) throw projectError;
+        setProjectId(newProject.id);
+
+        // Create facility location
+        const { data: location, error: locationError } = await supabase
+          .from('facility_locations')
+          .insert({
+            project_id: newProject.id,
+            town: formData.facility_location.town,
+            province: formData.facility_location.province
+          })
+          .select()
+          .single();
+
+        if (locationError) throw locationError;
+
+        // Update project with facility location ID
+        const { error: updateError } = await supabase
+          .from('projects')
+          .update({ facility_location_id: location.id })
+          .eq('id', newProject.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Update existing project
+        const { error: updateError } = await supabase
+          .from('projects')
+          .update({
+            report_type: formData.reportType,
+            client_name: formData.client_name,
+            company_name: formData.company_name,
+            facility_process: formData.facility_process,
+            construction_year: formData.construction_year,
+            status: 'draft'
+          })
+          .eq('id', projectId);
+
+        if (updateError) throw updateError;
+
+        // Update facility location
+        const { error: locationError } = await supabase
+          .from('facility_locations')
+          .update({
+            town: formData.facility_location.town,
+            province: formData.facility_location.province
+          })
+          .eq('project_id', projectId);
+
+        if (locationError) throw locationError;
+      }
+
+      // Only proceed with related data if we're past step 0
+      if (currentStep > 0) {
+        // Handle buildings and construction materials
+        if (formData.buildings && formData.buildings.length > 0) {
+          // Delete existing buildings and their materials
+          const { error: deleteError } = await supabase
+            .from('buildings')
+            .delete()
+            .eq('project_id', projectId);
+
+          if (deleteError) throw deleteError;
+
+          // Insert new buildings and their materials
+          for (const building of formData.buildings) {
+            const { data: newBuilding, error: buildingError } = await supabase
+              .from('buildings')
+              .insert({
+                project_id: projectId,
+                name: building.name,
+                classification: building.classification,
+                total_building_area: building.total_building_area,
+                cad_drawing: building.cad_drawing,
+                aerial_view: building.aerial_view
+              })
+              .select()
+              .single();
+
+            if (buildingError) throw buildingError;
+
+            // Insert construction materials
+            if (building.construction_materials) {
+              const { error: materialsError } = await supabase
+                .from('building_construction_materials')
+                .insert({
+                  building_id: newBuilding.id,
+                  brick: building.construction_materials.brick,
+                  steel: building.construction_materials.steel,
+                  concrete: building.construction_materials.concrete,
+                  timber: building.construction_materials.timber,
+                  other: building.construction_materials.other
+                });
+
+              if (materialsError) throw materialsError;
+            }
+          }
+        }
+
+        // Handle zones and zone photos
+        if (formData.zones && formData.zones.length > 0) {
+          // Delete existing zones and their photos
+          const { error: deleteError } = await supabase
+            .from('zones')
+            .delete()
+            .eq('project_id', projectId);
+
+          if (deleteError) throw deleteError;
+
+          // Insert new zones and their photos
+          for (const zone of formData.zones) {
+            const { data: newZone, error: zoneError } = await supabase
+              .from('zones')
+              .insert({
+                project_id: projectId,
+                name: zone.name,
+                classification: zone.classification,
+                area: zone.area,
+                occupancy_type: zone.occupancy_type,
+                fire_load: zone.fire_load
+              })
+              .select()
+              .single();
+
+            if (zoneError) throw zoneError;
+
+            // Insert zone photos
+            if (zone.photos && zone.photos.length > 0) {
+              const { error: photosError } = await supabase
+                .from('zone_photos')
+                .insert(
+                  zone.photos.map(photo => ({
+                    zone_id: newZone.id,
+                    photo_url: photo
+                  }))
+                );
+
+              if (photosError) throw photosError;
+            }
+          }
+        }
+
+        // Handle commodities
+        if (currentStep >= 4 && formData.expected_commodities && formData.expected_commodities.length > 0) {
+          // Delete existing commodities
+          const { error: deleteError } = await supabase
+            .from('expected_commodities')
+            .delete()
+            .eq('project_id', projectId);
+
+          if (deleteError) throw deleteError;
+
+          // Insert new commodities
+          const { error: commoditiesError } = await supabase
+            .from('expected_commodities')
+            .insert(
+              formData.expected_commodities.map(commodity => ({
+                project_id: projectId,
+                name: commodity.name,
+                category: commodity.category,
+                stacking_height: commodity.stacking_height,
+                storage_type: commodity.storage_type
+              }))
+            );
+
+          if (commoditiesError) throw commoditiesError;
+        }
+
+        // Handle special risks (step 5)
+        if (currentStep >= 5 && formData.special_risks && formData.special_risks.length > 0) {
+          // Delete existing special risks
+          const { error: deleteError } = await supabase
+            .from('special_risks')
+            .delete()
+            .eq('project_id', projectId);
+
+          if (deleteError) {
+            console.error('Error deleting special risks:', deleteError);
+            throw deleteError;
+          }
+
+          // Insert new special risks
+          for (const risk of formData.special_risks) {
+            try {
+              const { data: newRisk, error: riskError } = await supabase
+                .from('special_risks')
+                .insert({
+                  project_id: projectId,
+                  risk_type: risk.risk_type,
+                  location: risk.location,
+                  details: risk.details,
+                  photo_url: risk.photo_url || null
+                })
+                .select()
+                .single();
+
+              if (riskError) {
+                console.error('Error inserting special risk:', riskError);
+                throw riskError;
+              }
+            } catch (error) {
+              console.error('Error processing special risk:', error);
+              throw error;
+            }
+          }
+        }
+
+        // Handle Automatic Fire Extinguishment Areas
+        if (currentStep >= 6) {
+          // Delete existing automatic fire extinguishment areas
+          await supabase
+            .from('automatic_fire_extinguishment_areas')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new automatic fire extinguishment areas
+          await Promise.all(
+            formData.automatic_fire_extinguishment_areas.map(area =>
+              supabase.from('automatic_fire_extinguishment_areas').insert({
+                project_id: projectId,
+                name: area.name,
+                commodity_name: area.commodity_name,
+                maximum_stacking_height: area.maximum_stacking_height
+              })
+            )
+          );
+        }
+
+        // Handle Fire Protection Systems
+        if (currentStep >= 6) {
+          // Delete existing fire protection systems
+          await supabase
+            .from('fire_protection_systems')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new fire protection systems
+          await Promise.all(
+            formData.fire_protection_systems.map(system =>
+              supabase.from('fire_protection_systems').insert({
+                project_id: projectId,
+                type: system.type,
+                description: system.description,
+                coverage: system.coverage,
+                maintenance_status: system.maintenance_status
+              })
+            )
+          );
+        }
+
+        // Handle Emergency Procedures
+        if (currentStep >= 6) {
+          // Delete existing emergency procedures
+          await supabase
+            .from('emergency_procedures')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new emergency procedures
+          await Promise.all(
+            formData.emergency_procedures.map(procedure =>
+              supabase.from('emergency_procedures').insert({
+                project_id: projectId,
+                type: procedure.type,
+                description: procedure.description,
+                responsible_person: procedure.responsible_person,
+                contact_number: procedure.contact_number
+              })
+            )
+          );
+        }
+
+        // Handle Occupancy Separation
+        if (currentStep >= 6) {
+          // Delete existing occupancy separation
+          await supabase
+            .from('occupancy_separations')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new occupancy separation
+          await supabase.from('occupancy_separations').insert({
+            project_id: projectId,
+            separation_type: formData.occupancy_separations.separation_type,
+            rating: formData.occupancy_separations.rating
+          });
+        }
+
+        // Handle Divisional Separation
+        if (currentStep >= 6) {
+          // Delete existing divisional separation
+          await supabase
+            .from('divisional_separations')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new divisional separation
+          await supabase.from('divisional_separations').insert({
+            project_id: projectId,
+            fire_rated_walls: formData.divisional_separations.fire_rated_walls,
+            fire_rated_doors: formData.divisional_separations.fire_rated_doors
+          });
+        }
+
+        // Handle Escape Routes
+        if (currentStep >= 6) {
+          // Delete existing escape routes
+          await supabase
+              .from('escape_routes')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new escape routes
+          await Promise.all(
+            formData.escape_routes.map(route =>
+              supabase.from('escape_routes').insert({
+                  project_id: projectId,
+                  name: route.name,
+                  travel_distance: route.travel_distance,
+                  width: route.width
+              })
+            )
+          );
+        }
+
+        // Handle Emergency Staircases
+        if (currentStep >= 6) {
+          // Delete existing emergency staircases
+          await supabase
+              .from('emergency_staircases')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new emergency staircases
+          await Promise.all(
+            formData.emergency_staircases.map(staircase =>
+              supabase.from('emergency_staircases').insert({
+                  project_id: projectId,
+                  name: staircase.name,
+                  width: staircase.width,
+                fire_rated: staircase.fire_rated
+              })
+            )
+          );
+        }
+
+        // Handle Signage Items
+        if (currentStep >= 6) {
+          // Delete existing signage items
+          await supabase
+              .from('signage_items')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new signage items
+          await Promise.all(
+            formData.signage_items.map(sign =>
+              supabase.from('signage_items').insert({
+                  project_id: projectId,
+                sign_type: sign.sign_type,
+                location: sign.location,
+                photoluminescent: sign.photoluminescent
+              })
+            )
+          );
+        }
+
+        // Handle Emergency Lighting Zones
+        if (currentStep >= 6) {
+          // Delete existing emergency lighting zones
+          await supabase
+              .from('emergency_lighting_zones')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new emergency lighting zones
+          await Promise.all(
+            formData.emergency_lighting_zones.map(zone =>
+              supabase.from('emergency_lighting_zones').insert({
+                  project_id: projectId,
+                  name: zone.name,
+                  duration: zone.duration,
+                  lux_level: zone.lux_level
+              })
+            )
+          );
+        }
+
+        // Handle Fire Hose Reels
+        if (currentStep >= 6) {
+          // Delete existing fire hose reels
+          await supabase
+              .from('fire_hose_reels')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new fire hose reels
+          await Promise.all(
+            formData.fire_hose_reels.map(reel =>
+              supabase.from('fire_hose_reels').insert({
+                  project_id: projectId,
+                  location: reel.location,
+                hose_length: reel.hose_length,
+                  coverage_radius: reel.coverage_radius
+              })
+            )
+          );
+        }
+
+        // Handle Fire Extinguishers
+        if (currentStep >= 6) {
+          // Delete existing fire extinguishers
+          await supabase
+              .from('fire_extinguishers')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new fire extinguishers
+          await Promise.all(
+            formData.fire_extinguishers.map(extinguisher =>
+              supabase.from('fire_extinguishers').insert({
+                  project_id: projectId,
+                extinguisher_type: extinguisher.extinguisher_type,
+                  location: extinguisher.location,
+                  capacity: extinguisher.capacity
+              })
+            )
+          );
+        }
+
+        // Handle Fire Hydrants
+        if (currentStep >= 6) {
+          // Delete existing fire hydrants
+          await supabase
+              .from('fire_hydrants')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new fire hydrants
+          await Promise.all(
+            formData.fire_hydrants.map(hydrant =>
+              supabase.from('fire_hydrants').insert({
+                  project_id: projectId,
+                  location: hydrant.location,
+                hydrant_type: hydrant.hydrant_type,
+                  flow_rate: hydrant.flow_rate
+              })
+            )
+          );
+        }
+
+        // Handle Fire Water
+        if (currentStep >= 6) {
+          // Delete existing fire water
+          await supabase
+            .from('firewater')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new fire water
+          await supabase.from('firewater').insert({
+                project_id: projectId,
+            source: formData.firewater.source,
+            capacity: formData.firewater.capacity,
+            pressure: formData.firewater.pressure
+          });
+        }
+
+        // Handle Fire Detection
+        if (currentStep >= 6) {
+          // Delete existing fire detection
+          await supabase
+              .from('fire_detection')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new fire detection
+          await supabase.from('fire_detection').insert({
+                project_id: projectId,
+                system_type: formData.fire_detection.system_type,
+                number_of_zones: formData.fire_detection.number_of_zones,
+            battery_backup: formData.fire_detection.battery_backup
+          });
+        }
+
+        // Handle Fire Alarm Panel
+        if (currentStep >= 6) {
+          // Delete existing fire alarm panel
+          await supabase
+              .from('fire_alarm_panel')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new fire alarm panel
+          await supabase.from('fire_alarm_panel').insert({
+                project_id: projectId,
+            panel_layout: formData.fire_alarm_panel.panel_layout,
+            zone_name: formData.fire_alarm_panel.zone_name
+          });
+        }
+
+        // Handle Smoke Ventilation Zones
+        if (currentStep >= 6) {
+          // Delete existing smoke ventilation zones
+          await supabase
+              .from('smoke_ventilation_zones')
+            .delete()
+            .eq('project_id', projectId);
+
+          // Insert new smoke ventilation zones
+          await Promise.all(
+            formData.smoke_ventilation_zones.map(zone =>
+              supabase.from('smoke_ventilation_zones').insert({
+                  project_id: projectId,
+                name: zone.name,
+                area: zone.area,
+                ventilation_rate: zone.ventilation_rate
+              })
+            )
+          );
+        }
+
+        toast.success('Draft saved successfully');
+      }
     } catch (error) {
-      toast.error('Failed to save draft');
-    } finally {
-      setLoading(false);
+      console.error('Error saving draft:', error);
+      toast.error('Failed to save draft. Please try again.');
     }
   };
 
@@ -480,86 +1043,25 @@ const ProjectWizard = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (!projectId) {
+      toast.error('No project ID found');
+      return;
+    }
 
     try {
-      // Create project in Supabase
-      const { data: project, error } = await supabase
-        .from('projects')
-        .insert([
-          {
-            name: formData.company_name,
-            client_name: formData.client_name,
-            facility_process: formData.facility_process,
-            facility_location: formData.facility_location,
-            construction_year: formData.construction_year,
-            divisional_separation: formData.divisional_separation,
-            fire_alarm: formData.fire_alarm,
-            mandatory_actions: formData.mandatory_actions,
-            optional_actions: formData.optional_actions,
-            user_id: userDetails?.id,
-            status: 'active',
-            report_type: formData.reportType
-          }
-        ])
-        .select()
-        .single();
+      // Update the project status to 'completed'
+        const { error: updateError } = await supabase
+          .from('projects')
+        .update({ status: 'completed' })
+        .eq('id', projectId);
 
-      if (error) throw error;
+        if (updateError) throw updateError;
 
-      // Generate text file content
-      const fileContent = `Project Information
-===================
-
-Basic Information
-----------------
-Company Name: ${formData.company_name}
-Client Name: ${formData.client_name}
-Facility Process: ${formData.facility_process}
-Location: ${formData.facility_location.town}, ${formData.facility_location.province}
-Construction Year: ${formData.construction_year}
-
-Divisional Separation
--------------------
-Fire Rated Walls: ${formData.divisional_separation.fire_rated_walls ? 'Yes' : 'No'}
-Fire Rated Doors: ${formData.divisional_separation.fire_rated_doors ? 'Yes' : 'No'}
-Penetrations: ${formData.divisional_separation.penetrations ? 'Yes' : 'No'}
-Separation Plan: ${formData.divisional_separation.separation_plan || 'Not uploaded'}
-
-Fire Alarm System
-----------------
-Panel Layout: ${formData.fire_alarm.panel_layout || 'Not uploaded'}
-Sprinkler Zones: ${formData.fire_alarm.sprinkler_zones.join(', ') || 'None specified'}
-Hydrant Locations: ${formData.fire_alarm.hydrant_locations.join(', ') || 'None specified'}
-
-Mandatory Actions
-----------------
-${formData.mandatory_actions.map((action, index) => `${index + 1}. ${action}`).join('\n')}
-
-Optional Actions
----------------
-${formData.optional_actions.map((action, index) => `${index + 1}. ${action}`).join('\n')}
-
-Generated on: ${new Date().toLocaleString()}
-`;
-
-      // Create and save the file
-      const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
-      saveAs(blob, `${formData.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_project_info.txt`);
-
-      // Refresh projects list
-      await refreshProjects();
-
-      // Show success message
-      toast.success('Project created successfully');
-
-      // Navigate to project details
-      navigate(`/projects/${project.id}`);
-    } catch (error: any) {
-      console.error('Error creating project:', error);
-      toast.error(error.message || 'Failed to create project');
-    } finally {
-      setLoading(false);
+      toast.success('Project completed successfully');
+      navigate(`/projects/${projectId}`);
+    } catch (error) {
+      console.error('Error completing project:', error);
+      toast.error('Failed to complete project. Please try again.');
     }
   };
 
@@ -885,11 +1387,11 @@ Generated on: ${new Date().toLocaleString()}
               </div>
             </div>
                       <div>
-                        <Label htmlFor={`buildings.${index}.total_floor_area`}>Total Building Area (m²)</Label>
+                        <Label htmlFor={`buildings.${index}.total_building_area`}>Total Building Area (m²)</Label>
                         <Input
                           type="number"
-                          value={building.total_floor_area}
-                          onChange={(e) => handleArrayChange('buildings', index, { ...building, total_floor_area: parseFloat(e.target.value) })}
+                          value={building.total_building_area}
+                          onChange={(e) => handleArrayChange('buildings', index, { ...building, total_building_area: parseFloat(e.target.value) })}
                           className={inputStyles}
                           placeholder="Enter total building area"
                         />
@@ -909,14 +1411,8 @@ Generated on: ${new Date().toLocaleString()}
                     timber: false,
                     other: ''
                   },
-                  total_floor_area: 0,
-                  floor_plan: '',
+                  total_building_area: 0,
                   cad_drawing: '',
-                  sans_10400_t_table: '',
-                  fire_load: {
-                    commodities: [],
-                    total_timber_equivalent: 0
-                  },
                   aerial_view: ''
                 })}
                 className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
@@ -930,30 +1426,6 @@ Generated on: ${new Date().toLocaleString()}
       case 3:
         return (
           <div className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Project Summary</h3>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Company Name</p>
-                <p className="font-medium">{formData.company_name}</p>
-                </div>
-                <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Client</p>
-                <p className="font-medium">{formData.client_name}</p>
-                </div>
-                <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Facility Process</p>
-                <p className="font-medium">{formData.facility_process}</p>
-              </div>
-                  <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Location</p>
-                <p className="font-medium">{formData.facility_location.town}, {formData.facility_location.province}</p>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Construction Year</p>
-                <p className="font-medium">{formData.construction_year}</p>
-              </div>
-                    </div>
-                    
             {/* Zones Section */}
             <div className="space-y-2">
               <Label htmlFor="zones">Zones</Label>
@@ -973,8 +1445,8 @@ Generated on: ${new Date().toLocaleString()}
                     >
                       <X className="w-5 h-5" />
                     </button>
-                    </div>
-                    
+                  </div>
+                  
                   {expandedSections[`zone_${index}`] && (
                     <div className="space-y-4">
                       <div>
@@ -982,47 +1454,65 @@ Generated on: ${new Date().toLocaleString()}
                         <Input
                           type="text"
                           id={`zones.${index}.name`}
-                          name={`zones.${index}.name`}
                           value={zone.name}
-                          onChange={(e) => handleArrayChange('zones', index, { ...zone, name: e.target.value })}
+                          onChange={(e) => {
+                            const newZones = [...formData.zones];
+                            newZones[index] = { ...zone, name: e.target.value };
+                            handleInputChange('zones', newZones);
+                          }}
                           className={inputStyles}
                           placeholder="Enter zone name"
                         />
-                    </div>
+                      </div>
+
+                      {/* Photo Upload Section */}
                       <div>
-                        <Label htmlFor={`zones.${index}.photos`}>Photos</Label>
-                        <div className="flex flex-wrap gap-4">
-                          {zone.photos.map((photo, photoIndex) => (
+                        <Label>Photos</Label>
+                        <div className="grid grid-cols-2 gap-4">
+                          {zone.photos?.map((photo, photoIndex) => (
                             <div key={photoIndex} className="relative">
-                              <img src={photo} alt={`Zone ${index + 1} Photo ${photoIndex + 1}`} className="w-32 h-32 object-cover rounded-2xl" />
+                              <img
+                                src={photo}
+                                alt={`Zone ${index + 1} Photo ${photoIndex + 1}`}
+                                className="w-32 h-32 object-cover rounded-2xl"
+                              />
                               <button
                                 onClick={() => {
-                                  const newPhotos = zone.photos.filter((_, i) => i !== photoIndex);
-                                  handleArrayChange('zones', index, { ...zone, photos: newPhotos });
+                                  const newZones = [...formData.zones];
+                                  newZones[index].photos = newZones[index].photos.filter((_, i) => i !== photoIndex);
+                                  handleInputChange('zones', newZones);
                                 }}
                                 className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
                               >
                                 <X className="w-4 h-4" />
                               </button>
-                  </div>
+                            </div>
                           ))}
                           <button
                             onClick={() => {
-                              const newPhotos = [...zone.photos, 'placeholder.jpg'];
-                              handleArrayChange('zones', index, { ...zone, photos: newPhotos });
+                              // Add file upload logic here
+                              const newZones = [...formData.zones];
+                              if (!newZones[index].photos) {
+                                newZones[index].photos = [];
+                              }
+                              newZones[index].photos.push('placeholder.jpg');
+                              handleInputChange('zones', newZones);
                             }}
                             className="w-32 h-32 border-2 border-dashed rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-600"
                           >
                             <Upload className="w-8 h-8" />
                           </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
-          )}
-                  </div>
               ))}
               <button
-                onClick={() => handleArrayAdd('zones', { name: '', photos: [] })}
+                onClick={() => {
+                  const newZones = [...formData.zones, { name: '', photos: [] }];
+                  handleInputChange('zones', newZones);
+                }}
                 className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
               >
                 <Plus className="w-4 h-4" />
@@ -1034,10 +1524,9 @@ Generated on: ${new Date().toLocaleString()}
       case 4:
         return (
           <div className="space-y-6">
-            {/* Expected Commodities Section */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Expected Commodities</h4>
-              {formData.buildings[0]?.fire_load.commodities.map((commodity, index) => (
+            <div className="space-y-2">
+              <Label htmlFor="expected_commodities">Expected Commodities</Label>
+              {formData.expected_commodities.map((commodity, index) => (
                 <div key={index} className={cardStyles}>
                   <div className="flex items-center justify-between mb-4">
                     <button
@@ -1048,162 +1537,115 @@ Generated on: ${new Date().toLocaleString()}
                       {expandedSections[`commodity_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                     </button>
                     <button
-                      onClick={() => {
-                        const newCommodities = formData.buildings[0].fire_load.commodities.filter((_, i) => i !== index);
-                        handleArrayChange('buildings', 0, {
-                          ...formData.buildings[0],
-                          fire_load: {
-                            ...formData.buildings[0].fire_load,
-                            commodities: newCommodities
-                          }
-                        });
-                      }}
+                      onClick={() => handleArrayRemove('expected_commodities', index)}
                       className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
                     >
                       <X className="w-5 h-5" />
                     </button>
-                </div>
-                
+                  </div>
+                  
                   {expandedSections[`commodity_${index}`] && (
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor={`buildings.0.fire_load.commodities.${index}.name`}>Commodity Name</Label>
+                        <Label htmlFor={`expected_commodities.${index}.name`}>Commodity Name</Label>
                         <Input
                           type="text"
-                          id={`buildings.0.fire_load.commodities.${index}.name`}
+                          id={`expected_commodities.${index}.name`}
                           value={commodity.name}
                           onChange={(e) => {
-                            const newCommodities = [...formData.buildings[0].fire_load.commodities];
+                            const newCommodities = [...formData.expected_commodities];
                             newCommodities[index] = { ...commodity, name: e.target.value };
-                            handleArrayChange('buildings', 0, {
-                              ...formData.buildings[0],
-                              fire_load: {
-                                ...formData.buildings[0].fire_load,
-                                commodities: newCommodities
-                              }
-                            });
+                            handleInputChange('expected_commodities', newCommodities);
                           }}
                           className={inputStyles}
                           placeholder="Enter commodity name"
                         />
                       </div>
+                      
                       <div>
-                        <Label htmlFor={`buildings.0.fire_load.commodities.${index}.category`}>Category</Label>
+                        <Label htmlFor={`expected_commodities.${index}.category`}>Category</Label>
                         <select
-                          id={`buildings.0.fire_load.commodities.${index}.category`}
+                          id={`expected_commodities.${index}.category`}
                           value={commodity.category}
                           onChange={(e) => {
-                            const newCommodities = [...formData.buildings[0].fire_load.commodities];
+                            const newCommodities = [...formData.expected_commodities];
                             newCommodities[index] = { ...commodity, category: e.target.value };
-                            handleArrayChange('buildings', 0, {
-                              ...formData.buildings[0],
-                              fire_load: {
-                                ...formData.buildings[0].fire_load,
-                                commodities: newCommodities
-                              }
-                            });
+                            handleInputChange('expected_commodities', newCommodities);
                           }}
                           className={inputStyles}
                         >
                           <option value="">Select category</option>
-                          <option value="I">Category I - Low Hazard</option>
-                          <option value="II">Category II - Medium Hazard</option>
-                          <option value="III">Category III - High Hazard</option>
-                          <option value="IV">Category IV - Extra High Hazard</option>
+                          <option value="Class I">Class I</option>
+                          <option value="Class II">Class II</option>
+                          <option value="Class III">Class III</option>
+                          <option value="Class IV">Class IV</option>
+                          <option value="Class V">Class V</option>
+                          <option value="Plastic">Plastic</option>
+                          <option value="Rubber">Rubber</option>
+                          <option value="Textile">Textile</option>
+                          <option value="Other">Other</option>
                         </select>
-                    </div>
+                      </div>
+                      
                       <div>
-                        <Label htmlFor={`buildings.0.fire_load.commodities.${index}.minimum_stacking_height`}>Stacking Height (m)</Label>
+                        <Label htmlFor={`expected_commodities.${index}.stacking_height`}>Stacking Height (m)</Label>
                         <Input
                           type="number"
-                          step="0.1"
-                          id={`buildings.0.fire_load.commodities.${index}.minimum_stacking_height`}
-                          value={commodity.minimum_stacking_height}
+                          id={`expected_commodities.${index}.stacking_height`}
+                          value={commodity.stacking_height}
                           onChange={(e) => {
-                            const newCommodities = [...formData.buildings[0].fire_load.commodities];
-                            newCommodities[index] = { ...commodity, minimum_stacking_height: parseFloat(e.target.value) };
-                            handleArrayChange('buildings', 0, {
-                              ...formData.buildings[0],
-                              fire_load: {
-                                ...formData.buildings[0].fire_load,
-                                commodities: newCommodities
-                              }
-                            });
+                            const newCommodities = [...formData.expected_commodities];
+                            newCommodities[index] = { ...commodity, stacking_height: parseFloat(e.target.value) };
+                            handleInputChange('expected_commodities', newCommodities);
                           }}
                           className={inputStyles}
-                          placeholder="Enter stacking height"
+                          placeholder="Enter stacking height in meters"
+                          min="0"
+                          step="0.1"
                         />
-                        {commodity.category && commodity.minimum_stacking_height > 0 && (
-                          <div className="mt-2">
-                            {(() => {
-                              const maxHeights = {
-                                'I': 3.0,
-                                'II': 2.5,
-                                'III': 2.0,
-                                'IV': 1.5
-                              };
-                              const maxHeight = maxHeights[commodity.category as keyof typeof maxHeights];
-                              if (commodity.minimum_stacking_height > maxHeight) {
-                                return (
-                                  <p className="text-sm text-red-500">
-                                    Warning: Stacking height exceeds maximum allowed height of {maxHeight}m for Category {commodity.category}
-                                  </p>
-                                );
-                              }
-                              return null;
-                            })()}
                       </div>
-                        )}
-                    </div>
+                      
                       <div>
-                        <Label htmlFor={`buildings.0.fire_load.commodities.${index}.storage_type`}>Storage Type</Label>
+                        <Label htmlFor={`expected_commodities.${index}.storage_type`}>Storage Type</Label>
                         <select
-                          id={`buildings.0.fire_load.commodities.${index}.storage_type`}
+                          id={`expected_commodities.${index}.storage_type`}
                           value={commodity.storage_type}
                           onChange={(e) => {
-                            const newCommodities = [...formData.buildings[0].fire_load.commodities];
+                            const newCommodities = [...formData.expected_commodities];
                             newCommodities[index] = { ...commodity, storage_type: e.target.value };
-                            handleArrayChange('buildings', 0, {
-                              ...formData.buildings[0],
-                              fire_load: {
-                                ...formData.buildings[0].fire_load,
-                                commodities: newCommodities
-                              }
-                            });
+                            handleInputChange('expected_commodities', newCommodities);
                           }}
                           className={inputStyles}
                         >
                           <option value="">Select storage type</option>
-                          <option value="palletized">Palletized</option>
-                          <option value="solid_pile">Solid Pile</option>
-                          <option value="shelf_storage">Shelf Storage</option>
-                          <option value="rack_storage">Rack Storage</option>
+                          <option value="Pallet Rack">Pallet Rack</option>
+                          <option value="Shelving">Shelving</option>
+                          <option value="Bulk Storage">Bulk Storage</option>
+                          <option value="Bin Storage">Bin Storage</option>
+                          <option value="Floor Stack">Floor Stack</option>
+                          <option value="Mezzanine">Mezzanine</option>
+                          <option value="Other">Other</option>
                         </select>
                       </div>
                     </div>
                   )}
-                  </div>
+                </div>
               ))}
+              
               <button
                 onClick={() => {
-                  const newCommodities = [...formData.buildings[0].fire_load.commodities, {
+                  const newCommodities = [...formData.expected_commodities, {
                     name: '',
                     category: '',
-                    minimum_stacking_height: 0,
+                    stacking_height: 0,
                     storage_type: ''
                   }];
-                  handleArrayChange('buildings', 0, {
-                    ...formData.buildings[0],
-                    fire_load: {
-                      ...formData.buildings[0].fire_load,
-                      commodities: newCommodities
-                    }
-                  });
+                  handleInputChange('expected_commodities', newCommodities);
                 }}
                 className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Expected Commodity</span>
+                <span>Add Commodity</span>
               </button>
             </div>
           </div>
@@ -1211,304 +1653,375 @@ Generated on: ${new Date().toLocaleString()}
       case 5:
         return (
           <div className="space-y-6">
-            {/* Occupancy Separation Section */}
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium">Special Risks</h4>
+            </div>
+            
             <div className="space-y-4">
+              {formData.special_risks.map((risk, index) => (
+                <div key={index} className={cardStyles}>
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      className="flex-1 flex items-center justify-between"
+                      onClick={() => toggleSection(`special_risk_${index}`)}
+                    >
+                      <span className="font-medium">Risk {index + 1}</span>
+                      {expandedSections[`special_risk_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => handleArrayRemove('special_risks', index)}
+                      className="ml-4 text-red-500 hover:text-red-700"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {expandedSections[`special_risk_${index}`] && (
+                    <div className="space-y-4">
+                    <div>
+                      <Label htmlFor={`risk_type_${index}`}>Risk Type</Label>
+                      <select
+                        id={`risk_type_${index}`}
+                        value={risk.risk_type}
+                        onChange={(e) => {
+                          const newRisks = [...formData.special_risks];
+                          newRisks[index] = { ...risk, risk_type: e.target.value };
+                          handleInputChange('special_risks', newRisks);
+                        }}
+                          className={inputStyles}
+                      >
+                        <option value="">Select Risk Type</option>
+                          <option value="diesel_tank">Diesel Tank</option>
+                          <option value="transformer">Transformer</option>
+                          <option value="inverter_battery_rooms">Inverter & Battery rooms</option>
+                          <option value="idle_pallets">Idle palletes storage (most common)</option>
+                          <option value="substations">Substations</option>
+                          <option value="oil_tanks">Oil Tanks</option>
+                          <option value="generator">Generator</option>
+                          <option value="mezannine">Mezannine</option>
+                          <option value="decommissioned_tanks">Decommissioned tanks</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor={`location_${index}`}>Location</Label>
+                      <input
+                        type="text"
+                        id={`location_${index}`}
+                        value={risk.location}
+                        onChange={(e) => {
+                          const newRisks = [...formData.special_risks];
+                          newRisks[index] = { ...risk, location: e.target.value };
+                          handleInputChange('special_risks', newRisks);
+                        }}
+                          className={inputStyles}
+                        placeholder="Enter risk location"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor={`details_${index}`}>Details</Label>
+                      <textarea
+                        id={`details_${index}`}
+                        value={risk.details}
+                        onChange={(e) => {
+                          const newRisks = [...formData.special_risks];
+                          newRisks[index] = { ...risk, details: e.target.value };
+                          handleInputChange('special_risks', newRisks);
+                        }}
+                          className={inputStyles}
+                        placeholder="Enter risk details"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Photo Upload (Optional)</Label>
+                        <div className="grid grid-cols-2 gap-4">
+                        {risk.photo_url ? (
+                          <div className="relative">
+                            <img
+                              src={risk.photo_url}
+                              alt={`Risk ${index + 1} photo`}
+                                className="w-32 h-32 object-cover rounded-2xl"
+                            />
+                            <button
+                              onClick={() => {
+                                const newRisks = [...formData.special_risks];
+                                newRisks[index] = { ...risk, photo_url: undefined };
+                                handleInputChange('special_risks', newRisks);
+                              }}
+                                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                            <button
+                              onClick={() => {
+                                // Add file upload logic here
+                                    const newRisks = [...formData.special_risks];
+                                newRisks[index] = { ...risk, photo_url: 'placeholder.jpg' };
+                                    handleInputChange('special_risks', newRisks);
+                              }}
+                              className="w-32 h-32 border-2 border-dashed rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-600"
+                            >
+                              <Upload className="w-8 h-8" />
+                            </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                handleArrayAdd('special_risks', {
+                  risk_type: '',
+                  location: '',
+                  details: '',
+                  photo_url: undefined
+                });
+              }}
+              className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Special Risk</span>
+            </button>
+          </div>
+        );
+      case 6:
+        return (
+          <div className="space-y-6">
+            {/* Occupancy Separation */}
+            <div className="space-y-2">
               <h4 className="font-medium">Occupancy Separation</h4>
               <div className={cardStyles}>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="occupancy_separation.type">Separation Type</Label>
+                    <Label htmlFor="occupancy_separations_separation_type">Type</Label>
                     <select
-                      id="occupancy_separation.type"
-                      value={formData.occupancy_separation.type}
-                      onChange={(e) => handleInputChange('occupancy_separation.type', e.target.value)}
+                      id="occupancy_separations_separation_type"
+                      value={formData.occupancy_separations.separation_type}
+                      onChange={(e) => handleInputChange('occupancy_separations', {
+                        ...formData.occupancy_separations,
+                        separation_type: e.target.value
+                      })}
                       className={inputStyles}
                     >
-                      <option value="">Select separation type</option>
-                      <option value="fire_rated_wall">Fire Rated Wall</option>
-                      <option value="fire_rated_door">Fire Rated Door</option>
-                      <option value="fire_rated_floor">Fire Rated Floor</option>
-                      <option value="fire_rated_ceiling">Fire Rated Ceiling</option>
+                      <option value="">Select type</option>
+                      <option value="fire_rated_walls">Fire Rated Walls</option>
+                      <option value="fire_rated_doors">Fire Rated Doors</option>
+                      <option value="fire_rated_ceilings">Fire Rated Ceilings</option>
+                      <option value="fire_rated_floors">Fire Rated Floors</option>
                     </select>
                   </div>
                   <div>
-                    <Label htmlFor="occupancy_separation.rating">Fire Rating (hours)</Label>
+                    <Label htmlFor="occupancy_separations_rating">Fire Rating (minutes)</Label>
                     <Input
                       type="number"
-                      id="occupancy_separation.rating"
-                      value={formData.occupancy_separation.rating}
-                      onChange={(e) => handleInputChange('occupancy_separation.rating', parseFloat(e.target.value))}
+                      id="occupancy_separations_rating"
+                      value={formData.occupancy_separations.rating}
+                      onChange={(e) => handleInputChange('occupancy_separations', {
+                        ...formData.occupancy_separations,
+                        rating: parseInt(e.target.value)
+                      })}
                       className={inputStyles}
-                      placeholder="Enter fire rating"
+                      min="0"
+                      step="30"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Divisional Separation Section */}
-            <div className="space-y-4">
+            {/* Divisional Separation */}
+            <div className="space-y-2">
               <h4 className="font-medium">Divisional Separation</h4>
               <div className={cardStyles}>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="divisional_separation.fire_rated_walls">Fire Rated Walls</Label>
-                      <label className={checkboxWrapperStyles}>
-                        <input
-                          type="checkbox"
-                          id="divisional_separation.fire_rated_walls"
-                          checked={formData.divisional_separation.fire_rated_walls}
-                          onChange={(e) => handleInputChange('divisional_separation.fire_rated_walls', e.target.checked)}
-                          className={checkboxStyles}
-                        />
-                        <span className="text-sm font-medium group-hover:text-fire transition-colors duration-200">
-                          Fire Rated Walls Present
-                        </span>
-                      </label>
-                    </div>
-                    <div>
-                      <Label htmlFor="divisional_separation.fire_rated_doors">Fire Rated Doors</Label>
-                      <label className={checkboxWrapperStyles}>
-                        <input
-                          type="checkbox"
-                          id="divisional_separation.fire_rated_doors"
-                          checked={formData.divisional_separation.fire_rated_doors}
-                          onChange={(e) => handleInputChange('divisional_separation.fire_rated_doors', e.target.checked)}
-                          className={checkboxStyles}
-                        />
-                        <span className="text-sm font-medium group-hover:text-fire transition-colors duration-200">
-                          Fire Rated Doors Present
-                        </span>
-                      </label>
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="fire_rated_walls"
+                      checked={formData.divisional_separations.fire_rated_walls}
+                      onChange={(e) => handleInputChange('divisional_separations', {
+                        ...formData.divisional_separations,
+                        fire_rated_walls: e.target.checked
+                      })}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <Label htmlFor="fire_rated_walls">Fire Rated Walls</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="fire_rated_doors"
+                      checked={formData.divisional_separations.fire_rated_doors}
+                      onChange={(e) => handleInputChange('divisional_separations', {
+                        ...formData.divisional_separations,
+                        fire_rated_doors: e.target.checked
+                      })}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <Label htmlFor="fire_rated_doors">Fire Rated Doors</Label>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Automatic Fire Extinguishment Section - Only shown when no divisional separation */}
-            {!formData.divisional_separation.fire_rated_walls && !formData.divisional_separation.fire_rated_doors && (
-              <div className="space-y-4">
-                <h4 className="font-medium">Automatic Fire Extinguishment</h4>
-                {formData.automatic_fire_extinguishment.areas.map((area, index) => (
-                  <div key={index} className={cardStyles}>
-                    <div className="flex items-center justify-between mb-4">
-                      <button
-                        className="flex items-center justify-between flex-grow"
-                        onClick={() => toggleSection(`fire_extinguishment_${index}`)}
-                      >
-                        <span className="font-medium">{area.name || `Area ${index + 1}`}</span>
-                        {expandedSections[`fire_extinguishment_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                      </button>
-                      <button
-                        onClick={() => {
-                          const newAreas = formData.automatic_fire_extinguishment.areas.filter((_, i) => i !== index);
-                          handleInputChange('automatic_fire_extinguishment.areas', newAreas);
-                        }}
-                        className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                    
-                    {expandedSections[`fire_extinguishment_${index}`] && (
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.name`}>Area Name</Label>
-                          <Input
-                            type="text"
-                            id={`automatic_fire_extinguishment.areas.${index}.name`}
-                            value={area.name}
-                            onChange={(e) => {
-                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
-                              newAreas[index] = { ...area, name: e.target.value };
-                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
-                            }}
-                            className={inputStyles}
-                            placeholder="Enter area name"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.commodity`}>Commodity</Label>
-                          <Input
-                            type="text"
-                            id={`automatic_fire_extinguishment.areas.${index}.commodity`}
-                            value={area.commodity}
-                            onChange={(e) => {
-                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
-                              newAreas[index] = { ...area, commodity: e.target.value };
-                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
-                            }}
-                            className={inputStyles}
-                            placeholder="Enter commodity type"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.category`}>Category</Label>
-                          <select
-                            id={`automatic_fire_extinguishment.areas.${index}.category`}
-                            value={area.category}
-                            onChange={(e) => {
-                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
-                              newAreas[index] = { ...area, category: e.target.value };
-                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
-                            }}
-                            className={inputStyles}
-                          >
-                            <option value="">Select category</option>
-                            <option value="I">Category I - Low Hazard</option>
-                            <option value="II">Category II - Medium Hazard</option>
-                            <option value="III">Category III - High Hazard</option>
-                            <option value="IV">Category IV - Extra High Hazard</option>
-                          </select>
-                        </div>
-                        <div>
-                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.storage_type`}>Storage Type</Label>
-                          <select
-                            id={`automatic_fire_extinguishment.areas.${index}.storage_type`}
-                            value={area.storage_type}
-                            onChange={(e) => {
-                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
-                              newAreas[index] = { ...area, storage_type: e.target.value };
-                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
-                            }}
-                            className={inputStyles}
-                          >
-                            <option value="">Select storage type</option>
-                            <option value="palletized">Palletized</option>
-                            <option value="solid_pile">Solid Pile</option>
-                            <option value="shelf_storage">Shelf Storage</option>
-                            <option value="rack_storage">Rack Storage</option>
-                          </select>
-                        </div>
-                        <div>
-                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.max_stacking_height`}>Maximum Stacking Height (m)</Label>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            id={`automatic_fire_extinguishment.areas.${index}.max_stacking_height`}
-                            value={area.max_stacking_height}
-                            onChange={(e) => {
-                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
-                              newAreas[index] = { ...area, max_stacking_height: parseFloat(e.target.value) };
-                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
-                            }}
-                            className={inputStyles}
-                            placeholder="Enter maximum stacking height"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`automatic_fire_extinguishment.areas.${index}.current_stacking_height`}>Current Stacking Height (m)</Label>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            id={`automatic_fire_extinguishment.areas.${index}.current_stacking_height`}
-                            value={area.current_stacking_height}
-                            onChange={(e) => {
-                              const newAreas = [...formData.automatic_fire_extinguishment.areas];
-                              newAreas[index] = { ...area, current_stacking_height: parseFloat(e.target.value) };
-                              handleInputChange('automatic_fire_extinguishment.areas', newAreas);
-                            }}
-                            className={inputStyles}
-                            placeholder="Enter current stacking height"
-                          />
-                        </div>
+            {/* Automatic Fire Extinguishment Areas Section */}
+            <div className="space-y-2">
+              <Label htmlFor="automatic_fire_extinguishment_areas">Automatic Fire Extinguishment Areas</Label>
+              {formData.automatic_fire_extinguishment_areas.map((area, index) => (
+                <div key={index} className={cardStyles}>
+                    <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`automatic_fire_extinguishment_areas.${index}.name`}>Area Name</Label>
+                        <Input
+                          type="text"
+                        id={`automatic_fire_extinguishment_areas.${index}.name`}
+                          value={area.name}
+                        onChange={(e) => handleArrayChange('automatic_fire_extinguishment_areas', index, { ...area, name: e.target.value })}
+                          className={inputStyles}
+                        placeholder="Enter area name"
+                        />
                       </div>
-                    )}
-                  </div>
-                ))}
-                <button
-                  onClick={() => {
-                    const newAreas = [...formData.automatic_fire_extinguishment.areas, {
-                      name: '',
-                      commodity: '',
-                      category: '',
-                      storage_type: '',
-                      max_stacking_height: 0,
-                      current_stacking_height: 0
-                    }];
-                    handleInputChange('automatic_fire_extinguishment.areas', newAreas);
-                  }}
-                  className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Fire Extinguishment Area</span>
-                </button>
-              </div>
-            )}
+                    <div className="space-y-2">
+                      <Label htmlFor={`automatic_fire_extinguishment_areas.${index}.commodity_name`}>Commodity</Label>
+                        <select
+                        id={`automatic_fire_extinguishment_areas.${index}.commodity_name`}
+                        value={area.commodity_name}
+                        onChange={(e) => handleArrayChange('automatic_fire_extinguishment_areas', index, { ...area, commodity_name: e.target.value })}
+                          className={inputStyles}
+                        >
+                        <option value="">Select a commodity</option>
+                        {formData.expected_commodities.map((commodity, idx) => (
+                          <option key={idx} value={commodity.name}>
+                            {commodity.name}
+                          </option>
+                        ))}
+                        </select>
+                      {area.commodity_name && (
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-2">
+                          <h4 className="font-medium text-sm mb-3">Commodity Details</h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Category</p>
+                              <p className="font-medium text-sm">
+                                {formData.expected_commodities.find(c => c.name === area.commodity_name)?.category || 'N/A'}
+                              </p>
+                      </div>
+                      <div>
+                              <p className="text-sm text-muted-foreground">Storage Type</p>
+                              <p className="font-medium text-sm">
+                                {formData.expected_commodities.find(c => c.name === area.commodity_name)?.storage_type || 'N/A'}
+                              </p>
+                      </div>
+                      <div>
+                              <p className="text-sm text-muted-foreground">Stacking Height</p>
+                              <p className="font-medium text-sm">
+                                {formData.expected_commodities.find(c => c.name === area.commodity_name)?.stacking_height || 'N/A'} m
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`automatic_fire_extinguishment_areas.${index}.maximum_stacking_height`}>Maximum Stacking Height (m)</Label>
+                        <Input
+                          type="number"
+                        id={`automatic_fire_extinguishment_areas.${index}.maximum_stacking_height`}
+                        value={area.maximum_stacking_height}
+                        onChange={(e) => handleArrayChange('automatic_fire_extinguishment_areas', index, { ...area, maximum_stacking_height: parseFloat(e.target.value) })}
+                          className={inputStyles}
+                        placeholder="Enter maximum stacking height"
+                          step="0.1"
+                        />
+                      </div>
+                    </div>
+                </div>
+              ))}
+              <button
+                onClick={() => handleArrayAdd('automatic_fire_extinguishment_areas', { name: '', commodity_name: '', maximum_stacking_height: 0 })}
+                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Area</span>
+              </button>
+            </div>
 
-            {/* Escape Routes Section */}
+            {/* Escape Routes */}
             <div className="space-y-4">
               <h4 className="font-medium">Escape Routes</h4>
-              {formData.escape_routes.routes.map((route, index) => (
+              {formData.escape_routes.map((route, index) => (
                 <div key={index} className={cardStyles}>
                   <div className="flex items-center justify-between mb-4">
                     <button
                       className="flex items-center justify-between flex-grow"
-                      onClick={() => toggleSection(`escape_route_${index}`)}
+                      onClick={() => toggleSection(`route_${index}`)}
                     >
                       <span className="font-medium">{route.name || `Route ${index + 1}`}</span>
-                      {expandedSections[`escape_route_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      {expandedSections[`route_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                     </button>
                     <button
-                      onClick={() => {
-                        const newRoutes = formData.escape_routes.routes.filter((_, i) => i !== index);
-                        handleInputChange('escape_routes.routes', newRoutes);
-                      }}
+                      onClick={() => handleArrayRemove('escape_routes', index)}
                       className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
                     >
                       <X className="w-5 h-5" />
                     </button>
                   </div>
                   
-                  {expandedSections[`escape_route_${index}`] && (
+                  {expandedSections[`route_${index}`] && (
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor={`escape_routes.routes.${index}.name`}>Route Name</Label>
+                        <Label htmlFor={`route_${index}_name`}>Route Name</Label>
                         <Input
                           type="text"
-                          id={`escape_routes.routes.${index}.name`}
+                          id={`route_${index}_name`}
                           value={route.name}
                           onChange={(e) => {
-                            const newRoutes = [...formData.escape_routes.routes];
+                            const newRoutes = [...formData.escape_routes];
                             newRoutes[index] = { ...route, name: e.target.value };
-                            handleInputChange('escape_routes.routes', newRoutes);
+                            handleInputChange('escape_routes', newRoutes);
                           }}
                           className={inputStyles}
-                          placeholder="Enter route name"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`escape_routes.routes.${index}.travel_distance`}>Travel Distance (m)</Label>
+                        <Label htmlFor={`route_${index}_travel_distance`}>Travel Distance (m)</Label>
                         <Input
                           type="number"
-                          step="0.1"
-                          id={`escape_routes.routes.${index}.travel_distance`}
+                          id={`route_${index}_travel_distance`}
                           value={route.travel_distance}
                           onChange={(e) => {
-                            const newRoutes = [...formData.escape_routes.routes];
+                            const newRoutes = [...formData.escape_routes];
                             newRoutes[index] = { ...route, travel_distance: parseFloat(e.target.value) };
-                            handleInputChange('escape_routes.routes', newRoutes);
+                            handleInputChange('escape_routes', newRoutes);
                           }}
                           className={inputStyles}
-                          placeholder="Enter travel distance"
+                          min="0"
+                          step="0.1"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`escape_routes.routes.${index}.width`}>Width (m)</Label>
+                        <Label htmlFor={`route_${index}_width`}>Width (m)</Label>
                         <Input
                           type="number"
-                          step="0.1"
-                          id={`escape_routes.routes.${index}.width`}
+                          id={`route_${index}_width`}
                           value={route.width}
                           onChange={(e) => {
-                            const newRoutes = [...formData.escape_routes.routes];
+                            const newRoutes = [...formData.escape_routes];
                             newRoutes[index] = { ...route, width: parseFloat(e.target.value) };
-                            handleInputChange('escape_routes.routes', newRoutes);
+                            handleInputChange('escape_routes', newRoutes);
                           }}
                           className={inputStyles}
-                          placeholder="Enter route width"
+                          min="0"
+                          step="0.1"
                         />
                       </div>
                     </div>
@@ -1517,12 +2030,12 @@ Generated on: ${new Date().toLocaleString()}
               ))}
               <button
                 onClick={() => {
-                  const newRoutes = [...formData.escape_routes.routes, {
+                  const newRoutes = [...formData.escape_routes, {
                     name: '',
                     travel_distance: 0,
                     width: 0
                   }];
-                  handleInputChange('escape_routes.routes', newRoutes);
+                  handleInputChange('escape_routes', newRoutes);
                 }}
                 className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
               >
@@ -1531,7 +2044,7 @@ Generated on: ${new Date().toLocaleString()}
               </button>
             </div>
 
-            {/* Emergency Staircases Section */}
+            {/* Emergency Staircases */}
             <div className="space-y-4">
               <h4 className="font-medium">Emergency Staircases</h4>
               {formData.emergency_staircases.map((staircase, index) => (
@@ -1545,10 +2058,7 @@ Generated on: ${new Date().toLocaleString()}
                       {expandedSections[`staircase_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                     </button>
                     <button
-                      onClick={() => {
-                        const newStaircases = formData.emergency_staircases.filter((_, i) => i !== index);
-                        handleInputChange('emergency_staircases', newStaircases);
-                      }}
+                      onClick={() => handleArrayRemove('emergency_staircases', index)}
                       className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
                     >
                       <X className="w-5 h-5" />
@@ -1558,10 +2068,10 @@ Generated on: ${new Date().toLocaleString()}
                   {expandedSections[`staircase_${index}`] && (
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor={`emergency_staircases.${index}.name`}>Staircase Name</Label>
+                        <Label htmlFor={`staircase_${index}_name`}>Staircase Name</Label>
                         <Input
                           type="text"
-                          id={`emergency_staircases.${index}.name`}
+                          id={`staircase_${index}_name`}
                           value={staircase.name}
                           onChange={(e) => {
                             const newStaircases = [...formData.emergency_staircases];
@@ -1569,15 +2079,13 @@ Generated on: ${new Date().toLocaleString()}
                             handleInputChange('emergency_staircases', newStaircases);
                           }}
                           className={inputStyles}
-                          placeholder="Enter staircase name"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`emergency_staircases.${index}.width`}>Width (m)</Label>
+                        <Label htmlFor={`emergency_staircase_${index}_width`}>Width (m)</Label>
                         <Input
                           type="number"
-                          step="0.1"
-                          id={`emergency_staircases.${index}.width`}
+                          id={`emergency_staircase_${index}_width`}
                           value={staircase.width}
                           onChange={(e) => {
                             const newStaircases = [...formData.emergency_staircases];
@@ -1585,27 +2093,23 @@ Generated on: ${new Date().toLocaleString()}
                             handleInputChange('emergency_staircases', newStaircases);
                           }}
                           className={inputStyles}
-                          placeholder="Enter staircase width"
+                          min="0"
+                          step="0.1"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor={`emergency_staircases.${index}.fire_rated`}>Fire Rated</Label>
-                        <label className={checkboxWrapperStyles}>
-                          <input
-                            type="checkbox"
-                            id={`emergency_staircases.${index}.fire_rated`}
-                            checked={staircase.fire_rated}
-                            onChange={(e) => {
-                              const newStaircases = [...formData.emergency_staircases];
-                              newStaircases[index] = { ...staircase, fire_rated: e.target.checked };
-                              handleInputChange('emergency_staircases', newStaircases);
-                            }}
-                            className={checkboxStyles}
-                          />
-                          <span className="text-sm font-medium group-hover:text-fire transition-colors duration-200">
-                            Fire Rated Staircase
-                          </span>
-                        </label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`emergency_staircase_${index}_fire_rated`}
+                          checked={staircase.fire_rated}
+                          onChange={(e) => {
+                            const newStaircases = [...formData.emergency_staircases];
+                            newStaircases[index] = { ...staircase, fire_rated: e.target.checked };
+                            handleInputChange('emergency_staircases', newStaircases);
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <Label htmlFor={`emergency_staircase_${index}_fire_rated`}>Fire Rated</Label>
                       </div>
                     </div>
                   )}
@@ -1616,6 +2120,7 @@ Generated on: ${new Date().toLocaleString()}
                   const newStaircases = [...formData.emergency_staircases, {
                     name: '',
                     width: 0,
+                    fire_rating: 0,
                     fire_rated: false
                   }];
                   handleInputChange('emergency_staircases', newStaircases);
@@ -1627,90 +2132,77 @@ Generated on: ${new Date().toLocaleString()}
               </button>
             </div>
 
-            {/* Signage Section */}
+            {/* Signage */}
             <div className="space-y-4">
               <h4 className="font-medium">Signage</h4>
-              {formData.signage.items.map((item, index) => (
+              {formData.signage_items.map((sign, index) => (
                 <div key={index} className={cardStyles}>
                   <div className="flex items-center justify-between mb-4">
                     <button
                       className="flex items-center justify-between flex-grow"
-                      onClick={() => toggleSection(`signage_${index}`)}
+                      onClick={() => toggleSection(`sign_${index}`)}
                     >
-                      <span className="font-medium">{item.type || `Sign ${index + 1}`}</span>
-                      {expandedSections[`signage_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      <span className="font-medium">{sign.sign_type || `Sign ${index + 1}`}</span>
+                      {expandedSections[`sign_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                     </button>
                     <button
-                      onClick={() => {
-                        const newItems = formData.signage.items.filter((_, i) => i !== index);
-                        handleInputChange('signage.items', newItems);
-                      }}
+                      onClick={() => handleArrayRemove('signage_items', index)}
                       className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
                     >
                       <X className="w-5 h-5" />
                     </button>
                   </div>
                   
-                  {expandedSections[`signage_${index}`] && (
+                  {expandedSections[`sign_${index}`] && (
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor={`signage.items.${index}.type`}>Sign Type</Label>
+                        <Label htmlFor={`sign_${index}_sign_type`}>Sign Type</Label>
                         <select
-                          id={`signage.items.${index}.type`}
-                          value={item.type}
+                          id={`sign_${index}_sign_type`}
+                          value={sign.sign_type}
                           onChange={(e) => {
-                            const newItems = [...formData.signage.items];
-                            newItems[index] = { ...item, type: e.target.value };
-                            handleInputChange('signage.items', newItems);
+                            const newSigns = [...formData.signage_items];
+                            newSigns[index] = { ...sign, sign_type: e.target.value };
+                            handleInputChange('signage_items', newSigns);
                           }}
                           className={inputStyles}
                         >
                           <option value="">Select sign type</option>
-                          <option value="exit">Exit Sign</option>
-                          <option value="fire_extinguisher">Fire Extinguisher Sign</option>
-                          <option value="fire_hose_reel">Fire Hose Reel Sign</option>
-                          <option value="emergency_exit">Emergency Exit Sign</option>
-                          <option value="assembly_point">Assembly Point Sign</option>
-                          <option value="no_smoking">No Smoking Sign</option>
-                          <option value="fire_route">Fire Route Sign</option>
-                          <option value="fire_alarm">Fire Alarm Sign</option>
-                          <option value="first_aid">First Aid Sign</option>
-                          <option value="other">Other</option>
+                          <option value="exit">Exit</option>
+                          <option value="fire_extinguisher">Fire Extinguisher</option>
+                          <option value="fire_hose_reel">Fire Hose Reel</option>
+                          <option value="fire_alarm">Fire Alarm</option>
+                          <option value="emergency_lighting">Emergency Lighting</option>
+                          <option value="assembly_point">Assembly Point</option>
                         </select>
                       </div>
                       <div>
-                        <Label htmlFor={`signage.items.${index}.location`}>Location</Label>
+                        <Label htmlFor={`sign_${index}_location`}>Location</Label>
                         <Input
                           type="text"
-                          id={`signage.items.${index}.location`}
-                          value={item.location}
+                          id={`sign_${index}_location`}
+                          value={sign.location}
                           onChange={(e) => {
-                            const newItems = [...formData.signage.items];
-                            newItems[index] = { ...item, location: e.target.value };
-                            handleInputChange('signage.items', newItems);
+                            const newSigns = [...formData.signage_items];
+                            newSigns[index] = { ...sign, location: e.target.value };
+                            handleInputChange('signage_items', newSigns);
                           }}
                           className={inputStyles}
-                          placeholder="Enter sign location"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor={`signage.items.${index}.photoluminescent`}>Photoluminescent</Label>
-                        <label className={checkboxWrapperStyles}>
-                          <input
-                            type="checkbox"
-                            id={`signage.items.${index}.photoluminescent`}
-                            checked={item.photoluminescent}
-                            onChange={(e) => {
-                              const newItems = [...formData.signage.items];
-                              newItems[index] = { ...item, photoluminescent: e.target.checked };
-                              handleInputChange('signage.items', newItems);
-                            }}
-                            className={checkboxStyles}
-                          />
-                          <span className="text-sm font-medium group-hover:text-fire transition-colors duration-200">
-                            Photoluminescent Sign
-                          </span>
-                        </label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`signage_${index}_photoluminescent`}
+                          checked={sign.photoluminescent === 'Yes'}
+                          onChange={(e) => {
+                            const newSignage = [...formData.signage_items];
+                            newSignage[index] = { ...sign, photoluminescent: e.target.checked ? 'Yes' : 'No' };
+                            handleInputChange('signage_items', newSignage);
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <Label htmlFor={`signage_${index}_photoluminescent`}>Photoluminescent</Label>
                       </div>
                     </div>
                   )}
@@ -1718,12 +2210,12 @@ Generated on: ${new Date().toLocaleString()}
               ))}
               <button
                 onClick={() => {
-                  const newItems = [...formData.signage.items, {
-                    type: '',
+                  const newSigns = [...formData.signage_items, {
+                    sign_type: '',
                     location: '',
-                    photoluminescent: false
+                    photoluminescent: ''
                   }];
-                  handleInputChange('signage.items', newItems);
+                  handleInputChange('signage_items', newSigns);
                 }}
                 className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
               >
@@ -1732,77 +2224,73 @@ Generated on: ${new Date().toLocaleString()}
               </button>
             </div>
 
-            {/* Emergency Lighting Section */}
+            {/* Emergency Lighting */}
             <div className="space-y-4">
               <h4 className="font-medium">Emergency Lighting</h4>
-              {formData.emergency_lighting.zones.map((zone, index) => (
+              {formData.emergency_lighting_zones.map((zone, index) => (
                 <div key={index} className={cardStyles}>
                   <div className="flex items-center justify-between mb-4">
                     <button
                       className="flex items-center justify-between flex-grow"
-                      onClick={() => toggleSection(`emergency_lighting_${index}`)}
+                      onClick={() => toggleSection(`lighting_${index}`)}
                     >
                       <span className="font-medium">{zone.name || `Zone ${index + 1}`}</span>
-                      {expandedSections[`emergency_lighting_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      {expandedSections[`lighting_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                     </button>
                     <button
-                      onClick={() => {
-                        const newZones = formData.emergency_lighting.zones.filter((_, i) => i !== index);
-                        handleInputChange('emergency_lighting.zones', newZones);
-                      }}
+                      onClick={() => handleArrayRemove('emergency_lighting_zones', index)}
                       className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
                     >
                       <X className="w-5 h-5" />
                     </button>
                   </div>
                   
-                  {expandedSections[`emergency_lighting_${index}`] && (
+                  {expandedSections[`lighting_${index}`] && (
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor={`emergency_lighting.zones.${index}.name`}>Zone Name</Label>
+                        <Label htmlFor={`lighting_${index}_name`}>Zone Name</Label>
                         <Input
                           type="text"
-                          id={`emergency_lighting.zones.${index}.name`}
+                          id={`lighting_${index}_name`}
                           value={zone.name}
                           onChange={(e) => {
-                            const newZones = [...formData.emergency_lighting.zones];
+                            const newZones = [...formData.emergency_lighting_zones];
                             newZones[index] = { ...zone, name: e.target.value };
-                            handleInputChange('emergency_lighting.zones', newZones);
+                            handleInputChange('emergency_lighting_zones', newZones);
                           }}
                           className={inputStyles}
-                          placeholder="Enter zone name"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`emergency_lighting.zones.${index}.duration`}>Duration (hours)</Label>
+                        <Label htmlFor={`lighting_${index}_duration`}>Duration (hours)</Label>
                         <Input
                           type="number"
-                          step="0.5"
-                          id={`emergency_lighting.zones.${index}.duration`}
+                          id={`lighting_${index}_duration`}
                           value={zone.duration}
                           onChange={(e) => {
-                            const newZones = [...formData.emergency_lighting.zones];
+                            const newZones = [...formData.emergency_lighting_zones];
                             newZones[index] = { ...zone, duration: parseFloat(e.target.value) };
-                            handleInputChange('emergency_lighting.zones', newZones);
+                            handleInputChange('emergency_lighting_zones', newZones);
                           }}
                           className={inputStyles}
-                          placeholder="Enter duration"
+                          min="0"
+                          step="0.5"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`emergency_lighting.zones.${index}.lux_level`}>Lux Level (lx)</Label>
+                        <Label htmlFor={`lighting_${index}_lux_level`}>Lux Level</Label>
                         <Input
                           type="number"
-                          step="0.1"
-                          id={`emergency_lighting.zones.${index}.lux_level`}
+                          id={`lighting_${index}_lux_level`}
                           value={zone.lux_level}
                           onChange={(e) => {
-                            const newZones = [...formData.emergency_lighting.zones];
+                            const newZones = [...formData.emergency_lighting_zones];
                             newZones[index] = { ...zone, lux_level: parseFloat(e.target.value) };
-                            handleInputChange('emergency_lighting.zones', newZones);
+                            handleInputChange('emergency_lighting_zones', newZones);
                           }}
                           className={inputStyles}
-                          placeholder="Enter lux level"
+                          min="0"
+                          step="0.1"
                         />
                       </div>
                     </div>
@@ -1811,21 +2299,21 @@ Generated on: ${new Date().toLocaleString()}
               ))}
               <button
                 onClick={() => {
-                  const newZones = [...formData.emergency_lighting.zones, {
+                  const newZones = [...formData.emergency_lighting_zones, {
                     name: '',
                     duration: 0,
                     lux_level: 0
                   }];
-                  handleInputChange('emergency_lighting.zones', newZones);
+                  handleInputChange('emergency_lighting_zones', newZones);
                 }}
                 className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Emergency Lighting Zone</span>
+                <span>Add Lighting Zone</span>
               </button>
             </div>
 
-            {/* Fire Hose Reels Section */}
+            {/* Fire Hose Reels */}
             <div className="space-y-4">
               <h4 className="font-medium">Fire Hose Reels</h4>
               {formData.fire_hose_reels.map((reel, index) => (
@@ -1833,29 +2321,26 @@ Generated on: ${new Date().toLocaleString()}
                   <div className="flex items-center justify-between mb-4">
                     <button
                       className="flex items-center justify-between flex-grow"
-                      onClick={() => toggleSection(`hose_reel_${index}`)}
+                      onClick={() => toggleSection(`reel_${index}`)}
                     >
-                      <span className="font-medium">{reel.location || `Hose Reel ${index + 1}`}</span>
-                      {expandedSections[`hose_reel_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      <span className="font-medium">{reel.location || `Reel ${index + 1}`}</span>
+                      {expandedSections[`reel_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                     </button>
                     <button
-                      onClick={() => {
-                        const newReels = formData.fire_hose_reels.filter((_, i) => i !== index);
-                        handleInputChange('fire_hose_reels', newReels);
-                      }}
+                      onClick={() => handleArrayRemove('fire_hose_reels', index)}
                       className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
                     >
                       <X className="w-5 h-5" />
                     </button>
                   </div>
                   
-                  {expandedSections[`hose_reel_${index}`] && (
+                  {expandedSections[`reel_${index}`] && (
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor={`fire_hose_reels.${index}.location`}>Location</Label>
+                        <Label htmlFor={`reel_${index}_location`}>Location</Label>
                         <Input
                           type="text"
-                          id={`fire_hose_reels.${index}.location`}
+                          id={`reel_${index}_location`}
                           value={reel.location}
                           onChange={(e) => {
                             const newReels = [...formData.fire_hose_reels];
@@ -1863,15 +2348,13 @@ Generated on: ${new Date().toLocaleString()}
                             handleInputChange('fire_hose_reels', newReels);
                           }}
                           className={inputStyles}
-                          placeholder="Enter hose reel location"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`fire_hose_reels.${index}.hose_length`}>Hose Length (m)</Label>
+                        <Label htmlFor={`reel_${index}_hose_length`}>Hose Length (m)</Label>
                         <Input
                           type="number"
-                          step="0.1"
-                          id={`fire_hose_reels.${index}.hose_length`}
+                          id={`reel_${index}_hose_length`}
                           value={reel.hose_length}
                           onChange={(e) => {
                             const newReels = [...formData.fire_hose_reels];
@@ -1879,15 +2362,15 @@ Generated on: ${new Date().toLocaleString()}
                             handleInputChange('fire_hose_reels', newReels);
                           }}
                           className={inputStyles}
-                          placeholder="Enter hose length"
+                          min="0"
+                          step="0.1"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`fire_hose_reels.${index}.coverage_radius`}>Coverage Radius (m)</Label>
+                        <Label htmlFor={`reel_${index}_coverage_radius`}>Coverage Radius (m)</Label>
                         <Input
                           type="number"
-                          step="0.1"
-                          id={`fire_hose_reels.${index}.coverage_radius`}
+                          id={`reel_${index}_coverage_radius`}
                           value={reel.coverage_radius}
                           onChange={(e) => {
                             const newReels = [...formData.fire_hose_reels];
@@ -1895,7 +2378,8 @@ Generated on: ${new Date().toLocaleString()}
                             handleInputChange('fire_hose_reels', newReels);
                           }}
                           className={inputStyles}
-                          placeholder="Enter coverage radius"
+                          min="0"
+                          step="0.1"
                         />
                       </div>
                     </div>
@@ -1914,11 +2398,11 @@ Generated on: ${new Date().toLocaleString()}
                 className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Fire Hose Reel</span>
+                <span>Add Hose Reel</span>
               </button>
             </div>
 
-            {/* Fire Extinguishers Section */}
+            {/* Fire Extinguishers */}
             <div className="space-y-4">
               <h4 className="font-medium">Fire Extinguishers</h4>
               {formData.fire_extinguishers.map((extinguisher, index) => (
@@ -1928,14 +2412,11 @@ Generated on: ${new Date().toLocaleString()}
                       className="flex items-center justify-between flex-grow"
                       onClick={() => toggleSection(`extinguisher_${index}`)}
                     >
-                      <span className="font-medium">{extinguisher.type || `Extinguisher ${index + 1}`}</span>
+                      <span className="font-medium">{extinguisher.extinguisher_type || `Extinguisher ${index + 1}`}</span>
                       {expandedSections[`extinguisher_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                     </button>
                     <button
-                      onClick={() => {
-                        const newExtinguishers = formData.fire_extinguishers.filter((_, i) => i !== index);
-                        handleInputChange('fire_extinguishers', newExtinguishers);
-                      }}
+                      onClick={() => handleArrayRemove('fire_extinguishers', index)}
                       className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
                     >
                       <X className="w-5 h-5" />
@@ -1945,32 +2426,30 @@ Generated on: ${new Date().toLocaleString()}
                   {expandedSections[`extinguisher_${index}`] && (
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor={`fire_extinguishers.${index}.type`}>Extinguisher Type</Label>
+                        <Label htmlFor={`extinguisher_${index}_extinguisher_type`}>Type</Label>
                         <select
-                          id={`fire_extinguishers.${index}.type`}
-                          value={extinguisher.type}
+                          id={`extinguisher_${index}_type`}
+                          value={extinguisher.extinguisher_type}
                           onChange={(e) => {
                             const newExtinguishers = [...formData.fire_extinguishers];
-                            newExtinguishers[index] = { ...extinguisher, type: e.target.value };
+                            newExtinguishers[index] = { ...extinguisher, extinguisher_type: e.target.value };
                             handleInputChange('fire_extinguishers', newExtinguishers);
                           }}
                           className={inputStyles}
                         >
-                          <option value="">Select extinguisher type</option>
+                          <option value="">Select type</option>
                           <option value="water">Water</option>
                           <option value="foam">Foam</option>
+                          <option value="dry_powder">Dry Powder</option>
                           <option value="co2">CO2</option>
-                          <option value="dry_chemical">Dry Chemical</option>
                           <option value="wet_chemical">Wet Chemical</option>
-                          <option value="clean_agent">Clean Agent</option>
-                          <option value="special">Special</option>
                         </select>
                       </div>
                       <div>
-                        <Label htmlFor={`fire_extinguishers.${index}.location`}>Location</Label>
+                        <Label htmlFor={`extinguisher_${index}_location`}>Location</Label>
                         <Input
                           type="text"
-                          id={`fire_extinguishers.${index}.location`}
+                          id={`extinguisher_${index}_location`}
                           value={extinguisher.location}
                           onChange={(e) => {
                             const newExtinguishers = [...formData.fire_extinguishers];
@@ -1978,15 +2457,13 @@ Generated on: ${new Date().toLocaleString()}
                             handleInputChange('fire_extinguishers', newExtinguishers);
                           }}
                           className={inputStyles}
-                          placeholder="Enter extinguisher location"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`fire_extinguishers.${index}.capacity`}>Capacity (kg)</Label>
+                        <Label htmlFor={`extinguisher_${index}_capacity`}>Capacity (kg)</Label>
                         <Input
                           type="number"
-                          step="0.1"
-                          id={`fire_extinguishers.${index}.capacity`}
+                          id={`extinguisher_${index}_capacity`}
                           value={extinguisher.capacity}
                           onChange={(e) => {
                             const newExtinguishers = [...formData.fire_extinguishers];
@@ -1994,7 +2471,8 @@ Generated on: ${new Date().toLocaleString()}
                             handleInputChange('fire_extinguishers', newExtinguishers);
                           }}
                           className={inputStyles}
-                          placeholder="Enter extinguisher capacity"
+                          min="0"
+                          step="0.1"
                         />
                       </div>
                     </div>
@@ -2004,7 +2482,7 @@ Generated on: ${new Date().toLocaleString()}
               <button
                 onClick={() => {
                   const newExtinguishers = [...formData.fire_extinguishers, {
-                    type: '',
+                    extinguisher_type: '',
                     location: '',
                     capacity: 0
                   }];
@@ -2013,11 +2491,11 @@ Generated on: ${new Date().toLocaleString()}
                 className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Fire Extinguisher</span>
+                <span>Add Extinguisher</span>
               </button>
             </div>
 
-            {/* Fire Hydrants Section */}
+            {/* Fire Hydrants */}
             <div className="space-y-4">
               <h4 className="font-medium">Fire Hydrants</h4>
               {formData.fire_hydrants.map((hydrant, index) => (
@@ -2031,10 +2509,7 @@ Generated on: ${new Date().toLocaleString()}
                       {expandedSections[`hydrant_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                     </button>
                     <button
-                      onClick={() => {
-                        const newHydrants = formData.fire_hydrants.filter((_, i) => i !== index);
-                        handleInputChange('fire_hydrants', newHydrants);
-                      }}
+                      onClick={() => handleArrayRemove('fire_hydrants', index)}
                       className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
                     >
                       <X className="w-5 h-5" />
@@ -2044,10 +2519,10 @@ Generated on: ${new Date().toLocaleString()}
                   {expandedSections[`hydrant_${index}`] && (
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor={`fire_hydrants.${index}.location`}>Location</Label>
+                        <Label htmlFor={`hydrant_${index}_location`}>Location</Label>
                         <Input
                           type="text"
-                          id={`fire_hydrants.${index}.location`}
+                          id={`hydrant_${index}_location`}
                           value={hydrant.location}
                           onChange={(e) => {
                             const newHydrants = [...formData.fire_hydrants];
@@ -2055,35 +2530,31 @@ Generated on: ${new Date().toLocaleString()}
                             handleInputChange('fire_hydrants', newHydrants);
                           }}
                           className={inputStyles}
-                          placeholder="Enter hydrant location"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`fire_hydrants.${index}.type`}>Hydrant Type</Label>
+                        <Label htmlFor={`hydrant_${index}_hydrant_type`}>Type</Label>
                         <select
-                          id={`fire_hydrants.${index}.type`}
-                          value={hydrant.type}
+                          id={`hydrant_${index}_hydrant_type`}
+                          value={hydrant.hydrant_type}
                           onChange={(e) => {
                             const newHydrants = [...formData.fire_hydrants];
-                            newHydrants[index] = { ...hydrant, type: e.target.value };
+                            newHydrants[index] = { ...hydrant, hydrant_type: e.target.value };
                             handleInputChange('fire_hydrants', newHydrants);
                           }}
                           className={inputStyles}
                         >
-                          <option value="">Select hydrant type</option>
+                          <option value="">Select type</option>
                           <option value="underground">Underground</option>
                           <option value="pillar">Pillar</option>
                           <option value="wall">Wall</option>
-                          <option value="roof">Roof</option>
-                          <option value="other">Other</option>
                         </select>
                       </div>
                       <div>
-                        <Label htmlFor={`fire_hydrants.${index}.flow_rate`}>Flow Rate (L/min)</Label>
+                        <Label htmlFor={`hydrant_${index}_flow_rate`}>Flow Rate (L/min)</Label>
                         <Input
                           type="number"
-                          step="1"
-                          id={`fire_hydrants.${index}.flow_rate`}
+                          id={`hydrant_${index}_flow_rate`}
                           value={hydrant.flow_rate}
                           onChange={(e) => {
                             const newHydrants = [...formData.fire_hydrants];
@@ -2091,7 +2562,8 @@ Generated on: ${new Date().toLocaleString()}
                             handleInputChange('fire_hydrants', newHydrants);
                           }}
                           className={inputStyles}
-                          placeholder="Enter flow rate"
+                          min="0"
+                          step="1"
                         />
                       </div>
                     </div>
@@ -2102,7 +2574,7 @@ Generated on: ${new Date().toLocaleString()}
                 onClick={() => {
                   const newHydrants = [...formData.fire_hydrants, {
                     location: '',
-                    type: '',
+                    hydrant_type: '',
                     flow_rate: 0
                   }];
                   handleInputChange('fire_hydrants', newHydrants);
@@ -2110,71 +2582,70 @@ Generated on: ${new Date().toLocaleString()}
                 className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Fire Hydrant</span>
+                <span>Add Hydrant</span>
               </button>
             </div>
 
-            {/* Fire Water Section */}
+            {/* Fire Water */}
             <div className="space-y-4">
               <h4 className="font-medium">Fire Water</h4>
               <div className={cardStyles}>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="firewater.source">Water Source</Label>
+                    <Label htmlFor="water_source">Water Source</Label>
                     <select
-                      id="firewater.source"
-                      value={formData.firewater.source}
-                      onChange={(e) => handleInputChange('firewater.source', e.target.value)}
+                      id="water_source"
+                      value={formData.firewater?.source || ''}
+                      onChange={(e) => handleInputChange('firewater', { ...formData.firewater, source: e.target.value })}
                       className={inputStyles}
                     >
                       <option value="">Select water source</option>
-                      <option value="municipal">Municipal Supply</option>
+                      <option value="municipal">Municipal</option>
                       <option value="storage_tank">Storage Tank</option>
                       <option value="dam">Dam</option>
                       <option value="river">River</option>
                       <option value="borehole">Borehole</option>
-                      <option value="other">Other</option>
                     </select>
                   </div>
                   <div>
-                    <Label htmlFor="firewater.capacity">Storage Capacity (kL)</Label>
+                    <Label htmlFor="capacity">Capacity (kL)</Label>
                     <Input
                       type="number"
-                      step="1"
-                      id="firewater.capacity"
-                      value={formData.firewater.capacity}
-                      onChange={(e) => handleInputChange('firewater.capacity', parseFloat(e.target.value))}
+                      id="capacity"
+                      value={formData.firewater?.capacity || ''}
+                      onChange={(e) => handleInputChange('firewater', { ...formData.firewater, capacity: parseFloat(e.target.value) })}
                       className={inputStyles}
-                      placeholder="Enter storage capacity"
+                      min="0"
+                      step="0.1"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="firewater.pressure">Pressure (kPa)</Label>
+                    <Label htmlFor="pressure">Pressure (kPa)</Label>
                     <Input
                       type="number"
-                      step="1"
-                      id="firewater.pressure"
-                      value={formData.firewater.pressure}
-                      onChange={(e) => handleInputChange('firewater.pressure', parseFloat(e.target.value))}
+                      id="pressure"
+                      value={formData.firewater?.pressure || ''}
+                      onChange={(e) => handleInputChange('firewater', { ...formData.firewater, pressure: parseFloat(e.target.value) })}
                       className={inputStyles}
-                      placeholder="Enter pressure"
+                      min="0"
+                      step="0.1"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Fire Detection and Alarm Systems Section */}
+            {/* Fire Detection & Alarm Systems */}
             <div className="space-y-4">
-              <h4 className="font-medium">Fire Detection and Alarm Systems</h4>
+              <h4 className="font-medium">Fire Detection & Alarm Systems</h4>
               <div className={cardStyles}>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="fire_detection.type">System Type</Label>
+                    <Label htmlFor="system_type">System Type</Label>
                     <select
-                      id="fire_detection.type"
-                      value={formData.fire_detection.type}
-                      onChange={(e) => handleInputChange('fire_detection.type', e.target.value)}
+                      id="system_type"
+                      value={formData.fire_detection?.system_type || ''}
+                      onChange={(e) => handleInputChange('fire_detection', { ...formData.fire_detection, system_type: e.target.value })}
                       className={inputStyles}
                     >
                       <option value="">Select system type</option>
@@ -2182,54 +2653,63 @@ Generated on: ${new Date().toLocaleString()}
                       <option value="addressable">Addressable</option>
                       <option value="wireless">Wireless</option>
                       <option value="hybrid">Hybrid</option>
-                      <option value="other">Other</option>
                     </select>
                   </div>
                   <div>
-                    <Label htmlFor="fire_detection.zones">Number of Zones</Label>
+                    <Label htmlFor="number_of_zones">Number of Zones</Label>
                     <Input
                       type="number"
-                      step="1"
-                      id="fire_detection.zones"
-                      value={formData.fire_detection.zones}
-                      onChange={(e) => handleInputChange('fire_detection.zones', parseInt(e.target.value))}
+                      id="number_of_zones"
+                      value={formData.fire_detection?.number_of_zones || ''}
+                      onChange={(e) => handleInputChange('fire_detection', { ...formData.fire_detection, number_of_zones: parseInt(e.target.value) })}
                       className={inputStyles}
-                      placeholder="Enter number of zones"
+                      min="0"
+                      step="1"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="fire_detection.battery_backup">Battery Backup Duration (hours)</Label>
+                    <Label htmlFor="battery_backup">Battery Backup (hours)</Label>
                     <Input
                       type="number"
-                      step="0.5"
-                      id="fire_detection.battery_backup"
-                      value={formData.fire_detection.battery_backup}
-                      onChange={(e) => handleInputChange('fire_detection.battery_backup', parseFloat(e.target.value))}
+                      id="battery_backup"
+                      value={formData.fire_detection?.battery_backup || ''}
+                      onChange={(e) => handleInputChange('fire_detection', { ...formData.fire_detection, battery_backup: parseFloat(e.target.value) })}
                       className={inputStyles}
-                      placeholder="Enter battery backup duration"
+                      min="0"
+                      step="0.5"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Fire Alarm Panel and Zones Section */}
+            {/* Fire Alarm Panel & Zones */}
             <div className="space-y-4">
-              <h4 className="font-medium">Fire Alarm Panel and Zones</h4>
+              <h4 className="font-medium">Fire Alarm Panel & Zones</h4>
               <div className={cardStyles}>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="fire_alarm.panel_layout">Panel Layout</Label>
+                    <Label htmlFor="fire_alarm_panel.zone_name">Zone Name</Label>
+                    <Input
+                      type="text"
+                      id="fire_alarm_panel.zone_name"
+                      value={formData.fire_alarm_panel.zone_name}
+                      onChange={(e) => handleInputChange('fire_alarm_panel', { ...formData.fire_alarm_panel, zone_name: e.target.value })}
+                      className={inputStyles}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fire_alarm_panel.panel_layout">Layout</Label>
                     <div className="flex items-center space-x-4">
-                      {formData.fire_alarm.panel_layout ? (
+                      {formData.fire_alarm_panel?.panel_layout ? (
                         <div className="relative">
                           <img
-                            src={formData.fire_alarm.panel_layout}
+                            src={formData.fire_alarm_panel.panel_layout}
                             alt="Panel Layout"
                             className="w-32 h-32 object-cover rounded-2xl"
                           />
                           <button
-                            onClick={() => handleInputChange('fire_alarm.panel_layout', '')}
+                            onClick={() => handleInputChange('fire_alarm_panel', { ...formData.fire_alarm_panel, panel_layout: '' })}
                             className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
                           >
                             <X className="w-4 h-4" />
@@ -2239,7 +2719,7 @@ Generated on: ${new Date().toLocaleString()}
                         <button
                           onClick={() => {
                             // Add file upload logic here
-                            handleInputChange('fire_alarm.panel_layout', 'placeholder.jpg');
+                            handleInputChange('fire_alarm_panel', { ...formData.fire_alarm_panel, panel_layout: 'placeholder.jpg' });
                           }}
                           className="w-32 h-32 border-2 border-dashed rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-600"
                         >
@@ -2250,136 +2730,75 @@ Generated on: ${new Date().toLocaleString()}
                   </div>
                 </div>
               </div>
-
-              {/* Fire Alarm Zones */}
-              <div className="space-y-4">
-                <h5 className="font-medium">Fire Alarm Zones</h5>
-                {formData.fire_alarm.sprinkler_zones.map((zone, index) => (
-                  <div key={index} className={cardStyles}>
-                    <div className="flex items-center justify-between mb-4">
-                      <button
-                        className="flex items-center justify-between flex-grow"
-                        onClick={() => toggleSection(`fire_alarm_zone_${index}`)}
-                      >
-                        <span className="font-medium">{zone || `Zone ${index + 1}`}</span>
-                        {expandedSections[`fire_alarm_zone_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                      </button>
-                      <button
-                        onClick={() => {
-                          const newZones = formData.fire_alarm.sprinkler_zones.filter((_, i) => i !== index);
-                          handleInputChange('fire_alarm.sprinkler_zones', newZones);
-                        }}
-                        className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                    
-                    {expandedSections[`fire_alarm_zone_${index}`] && (
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor={`fire_alarm.sprinkler_zones.${index}`}>Zone Name</Label>
-                          <Input
-                            type="text"
-                            id={`fire_alarm.sprinkler_zones.${index}`}
-                            value={zone}
-                            onChange={(e) => {
-                              const newZones = [...formData.fire_alarm.sprinkler_zones];
-                              newZones[index] = e.target.value;
-                              handleInputChange('fire_alarm.sprinkler_zones', newZones);
-                            }}
-                            className={inputStyles}
-                            placeholder="Enter zone name"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <button
-                  onClick={() => {
-                    const newZones = [...formData.fire_alarm.sprinkler_zones, ''];
-                    handleInputChange('fire_alarm.sprinkler_zones', newZones);
-                  }}
-                  className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Fire Alarm Zone</span>
-                </button>
-              </div>
             </div>
 
-            {/* Smoke Ventilation Section */}
+            {/* Smoke Ventilation */}
             <div className="space-y-4">
               <h4 className="font-medium">Smoke Ventilation</h4>
-              {formData.smoke_ventilation.zones.map((zone, index) => (
+              {formData.smoke_ventilation_zones.map((zone, index) => (
                 <div key={index} className={cardStyles}>
                   <div className="flex items-center justify-between mb-4">
                     <button
                       className="flex items-center justify-between flex-grow"
-                      onClick={() => toggleSection(`smoke_ventilation_${index}`)}
+                      onClick={() => toggleSection(`ventilation_${index}`)}
                     >
                       <span className="font-medium">{zone.name || `Zone ${index + 1}`}</span>
-                      {expandedSections[`smoke_ventilation_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      {expandedSections[`ventilation_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                     </button>
                     <button
-                      onClick={() => {
-                        const newZones = formData.smoke_ventilation.zones.filter((_, i) => i !== index);
-                        handleInputChange('smoke_ventilation.zones', newZones);
-                      }}
+                      onClick={() => handleArrayRemove('smoke_ventilation_zones', index)}
                       className="ml-4 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors duration-200"
                     >
                       <X className="w-5 h-5" />
                     </button>
                   </div>
                   
-                  {expandedSections[`smoke_ventilation_${index}`] && (
+                  {expandedSections[`ventilation_${index}`] && (
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor={`smoke_ventilation.zones.${index}.name`}>Zone Name</Label>
+                        <Label htmlFor={`ventilation_${index}_name`}>Zone Name</Label>
                         <Input
                           type="text"
-                          id={`smoke_ventilation.zones.${index}.name`}
+                          id={`ventilation_${index}_name`}
                           value={zone.name}
                           onChange={(e) => {
-                            const newZones = [...formData.smoke_ventilation.zones];
+                            const newZones = [...formData.smoke_ventilation_zones];
                             newZones[index] = { ...zone, name: e.target.value };
-                            handleInputChange('smoke_ventilation.zones', newZones);
+                            handleInputChange('smoke_ventilation_zones', newZones);
                           }}
                           className={inputStyles}
-                          placeholder="Enter zone name"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`smoke_ventilation.zones.${index}.area`}>Ventilation Area (m²)</Label>
+                        <Label htmlFor={`ventilation_${index}_area`}>Ventilation Area (m²)</Label>
                         <Input
                           type="number"
-                          step="0.1"
-                          id={`smoke_ventilation.zones.${index}.area`}
+                          id={`ventilation_${index}_area`}
                           value={zone.area}
                           onChange={(e) => {
-                            const newZones = [...formData.smoke_ventilation.zones];
+                            const newZones = [...formData.smoke_ventilation_zones];
                             newZones[index] = { ...zone, area: parseFloat(e.target.value) };
-                            handleInputChange('smoke_ventilation.zones', newZones);
+                            handleInputChange('smoke_ventilation_zones', newZones);
                           }}
                           className={inputStyles}
-                          placeholder="Enter ventilation area"
+                          min="0"
+                          step="0.1"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`smoke_ventilation.zones.${index}.ventilation_rate`}>Ventilation Rate (m³/s)</Label>
+                        <Label htmlFor={`ventilation_${index}_ventilation_rate`}>Ventilation Rate (m³/s)</Label>
                         <Input
                           type="number"
-                          step="0.1"
-                          id={`smoke_ventilation.zones.${index}.ventilation_rate`}
+                          id={`ventilation_${index}_ventilation_rate`}
                           value={zone.ventilation_rate}
                           onChange={(e) => {
-                            const newZones = [...formData.smoke_ventilation.zones];
+                            const newZones = [...formData.smoke_ventilation_zones];
                             newZones[index] = { ...zone, ventilation_rate: parseFloat(e.target.value) };
-                            handleInputChange('smoke_ventilation.zones', newZones);
+                            handleInputChange('smoke_ventilation_zones', newZones);
                           }}
                           className={inputStyles}
-                          placeholder="Enter ventilation rate"
+                          min="0"
+                          step="0.1"
                         />
                       </div>
                     </div>
@@ -2388,156 +2807,17 @@ Generated on: ${new Date().toLocaleString()}
               ))}
               <button
                 onClick={() => {
-                  const newZones = [...formData.smoke_ventilation.zones, {
+                  const newZones = [...formData.smoke_ventilation_zones, {
                     name: '',
                     area: 0,
                     ventilation_rate: 0
                   }];
-                  handleInputChange('smoke_ventilation.zones', newZones);
+                  handleInputChange('smoke_ventilation_zones', newZones);
                 }}
                 className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Smoke Ventilation Zone</span>
-              </button>
-            </div>
-          </div>
-        );
-      case 6:
-        return (
-          <div className="space-y-6">
-            {/* Special Risks Section */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Special Risks</h4>
-              {formData.special_risks.map((risk, index) => (
-                <div key={index} className={cardStyles}>
-                  <button
-                    className="w-full flex items-center justify-between mb-4"
-                    onClick={() => toggleSection(`special_risk_${index}`)}
-                  >
-                    <span className="font-medium">{risk.type || `Special Risk ${index + 1}`}</span>
-                    {expandedSections[`special_risk_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                  </button>
-                  
-                  {expandedSections[`special_risk_${index}`] && (
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor={`special_risks.${index}.type`}>Risk Type</Label>
-                        <select
-                          id={`special_risks.${index}.type`}
-                          value={risk.type}
-                          onChange={(e) => {
-                            const newRisks = [...formData.special_risks];
-                            newRisks[index] = { ...risk, type: e.target.value };
-                            handleInputChange('special_risks', newRisks);
-                          }}
-                          className={inputStyles}
-                        >
-                          <option value="">Select risk type</option>
-                          <option value="diesel_tank">Diesel Tank</option>
-                          <option value="transformer">Transformer</option>
-                          <option value="decommissioned_tanks">Decommissioned Tanks</option>
-                          <option value="inverter_battery_room">Inverter & Battery Room</option>
-                          <option value="pallet_storage">Idle Pallet Storage</option>
-                          <option value="forklift_charging">Forklift Charging Station</option>
-                          <option value="substation">Substation</option>
-                          <option value="oil_tank">Oil Tank</option>
-                          <option value="generator">Generator</option>
-                          <option value="mezzanine">Mezzanine</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label htmlFor={`special_risks.${index}.location`}>Location</Label>
-                        <Input
-                          type="text"
-                          id={`special_risks.${index}.location`}
-                          value={risk.location}
-                          onChange={(e) => {
-                            const newRisks = [...formData.special_risks];
-                            newRisks[index] = { ...risk, location: e.target.value };
-                            handleInputChange('special_risks', newRisks);
-                          }}
-                          className={inputStyles}
-                          placeholder="Enter location"
-                        />
-                    </div>
-                      <div>
-                        <Label htmlFor={`special_risks.${index}.details`}>Details</Label>
-                        <Textarea
-                          id={`special_risks.${index}.details`}
-                          value={risk.details}
-                          onChange={(e) => {
-                            const newRisks = [...formData.special_risks];
-                            newRisks[index] = { ...risk, details: e.target.value };
-                            handleInputChange('special_risks', newRisks);
-                          }}
-                          className={inputStyles}
-                          placeholder="Enter additional details"
-                        />
-                  </div>
-                      <div>
-                        <Label htmlFor={`special_risks.${index}.photo`}>Photo</Label>
-                        <div className="flex items-center space-x-4">
-                          {risk.photo ? (
-                            <div className="relative">
-                              <img
-                                src={risk.photo}
-                                alt={`${risk.type} Photo`}
-                                className="w-32 h-32 object-cover rounded-2xl"
-                              />
-                              <button
-                                onClick={() => {
-                                  const newRisks = [...formData.special_risks];
-                                  newRisks[index] = { ...risk, photo: '' };
-                                  handleInputChange('special_risks', newRisks);
-                                }}
-                                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-700"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                      </div>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                // Add file upload logic here
-                                const newRisks = [...formData.special_risks];
-                                newRisks[index] = { ...risk, photo: 'placeholder.jpg' };
-                                handleInputChange('special_risks', newRisks);
-                              }}
-                              className="w-32 h-32 border-2 border-dashed rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-600"
-                            >
-                              <Upload className="w-8 h-8" />
-                            </button>
-                          )}
-                    </div>
-                  </div>
-                      <button
-                        onClick={() => {
-                          const newRisks = formData.special_risks.filter((_, i) => i !== index);
-                          handleInputChange('special_risks', newRisks);
-                        }}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                </div>
-                  )}
-              </div>
-              ))}
-              <button
-                onClick={() => {
-                  const newRisks = [...formData.special_risks, {
-                    type: '',
-                    location: '',
-                    details: '',
-                    photo: ''
-                  }];
-                  handleInputChange('special_risks', newRisks);
-                }}
-                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Special Risk</span>
+                <span>Add Ventilation Zone</span>
               </button>
             </div>
           </div>
@@ -2602,15 +2882,15 @@ Generated on: ${new Date().toLocaleString()}
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Total Floor Area</p>
-                          <p className="font-medium">{building.total_floor_area ? `${building.total_floor_area} m²` : 'Not specified'}</p>
+                          <p className="font-medium">{building.total_building_area ? `${building.total_building_area} m²` : 'Not specified'}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Construction Materials</p>
                           <p className="font-medium">
-                            {Object.entries(building.construction_materials)
+                            {building.construction_materials ? Object.entries(building.construction_materials)
                               .filter(([_, value]) => value)
                               .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1))
-                              .join(', ') || 'Not specified'}
+                              .join(', ') : 'Not specified'}
                           </p>
                         </div>
                       </div>
@@ -2627,7 +2907,7 @@ Generated on: ${new Date().toLocaleString()}
                     <div key={index} className="space-y-2">
                       <p className="text-sm text-muted-foreground">Zone {index + 1}</p>
                       <p className="font-medium">{zone.name || 'Not specified'}</p>
-                      <p className="text-sm text-muted-foreground">Photos: {zone.photos.length}</p>
+                      <p className="text-sm text-muted-foreground">Photos: {zone.photos?.length || 0}</p>
                     </div>
                   ))}
                 </div>
@@ -2637,7 +2917,7 @@ Generated on: ${new Date().toLocaleString()}
               <div className={cardStyles}>
                 <h5 className="font-medium mb-4">Step 4: Commodity Classification</h5>
                 <div className="space-y-4">
-                  {formData.buildings[0]?.fire_load.commodities.map((commodity, index) => (
+                  {formData.expected_commodities.map((commodity, index) => (
                     <div key={index} className="space-y-2">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -2650,7 +2930,7 @@ Generated on: ${new Date().toLocaleString()}
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Stacking Height</p>
-                          <p className="font-medium">{commodity.minimum_stacking_height ? `${commodity.minimum_stacking_height} m` : 'Not specified'}</p>
+                          <p className="font-medium">{commodity.stacking_height ? `${commodity.stacking_height} m` : 'Not specified'}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Storage Type</p>
@@ -2662,9 +2942,30 @@ Generated on: ${new Date().toLocaleString()}
                 </div>
               </div>
 
-              {/* Step 5: Fire Protection Systems */}
+              {/* Step 5: Special Risks */}
               <div className={cardStyles}>
-                <h5 className="font-medium mb-4">Step 5: Fire Protection Systems</h5>
+                <h5 className="font-medium mb-4">Step 5: Special Risks</h5>
+                <div className="space-y-4">
+                  {formData.special_risks.map((risk, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Risk Type</p>
+                          <p className="font-medium">{risk.risk_type || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Location</p>
+                          <p className="font-medium">{risk.location || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 6: Fire Protection Systems */}
+              <div className={cardStyles}>
+                <h5 className="font-medium mb-4">Step 6: Fire Protection Systems</h5>
                 <div className="space-y-4">
                   {/* Fire Alarm System */}
                   <div>
@@ -2672,11 +2973,11 @@ Generated on: ${new Date().toLocaleString()}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-muted-foreground">System Type</p>
-                        <p className="font-medium">{formData.fire_detection.type || 'Not specified'}</p>
+                        <p className="font-medium">{formData.fire_detection.system_type || 'Not specified'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Number of Zones</p>
-                        <p className="font-medium">{formData.fire_detection.zones || 'Not specified'}</p>
+                        <p className="font-medium">{formData.fire_detection.number_of_zones || 'Not specified'}</p>
                       </div>
                     </div>
                   </div>
@@ -2702,133 +3003,26 @@ Generated on: ${new Date().toLocaleString()}
                   {/* Smoke Ventilation */}
                   <div>
                     <p className="text-sm text-muted-foreground">Smoke Ventilation Zones</p>
-                    <p className="font-medium">{formData.smoke_ventilation.zones.length} zones</p>
+                    <p className="font-medium">{formData.smoke_ventilation_zones.length} zones</p>
                   </div>
-                </div>
-              </div>
-
-              {/* Step 6: Special Risks */}
-              <div className={cardStyles}>
-                <h5 className="font-medium mb-4">Step 6: Special Risks</h5>
-                <div className="space-y-4">
-                  {formData.special_risks.map((risk, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Risk Type</p>
-                          <p className="font-medium">{risk.type || 'Not specified'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Location</p>
-                          <p className="font-medium">{risk.location || 'Not specified'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>
 
-            {/* Mandatory Actions Section */}
-            <div className="space-y-2">
-              <Label htmlFor="mandatory_actions">Mandatory Actions</Label>
-              {formData.mandatory_actions.map((action, index) => (
-                <div key={index} className={cardStyles}>
+            {/* Navigation Buttons */}
+            <div className="flex justify-between mt-6">
                   <button
-                    className="w-full flex items-center justify-between mb-4"
-                    onClick={() => toggleSection(`mandatory_${index}`)}
+                onClick={prevStep}
+                className={`${buttonStyles} btn-secondary`}
                   >
-                    <span className="font-medium">{action || `Mandatory Action ${index + 1}`}</span>
-                    {expandedSections[`mandatory_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                Previous
                   </button>
-                  
-                  {expandedSections[`mandatory_${index}`] && (
-                    <div className="space-y-4">
-                      <Input
-                        type="text"
-                        id={`mandatory_actions.${index}`}
-                        value={action}
-                        onChange={(e) => {
-                          const newActions = [...formData.mandatory_actions];
-                          newActions[index] = e.target.value;
-                          handleInputChange('mandatory_actions', newActions);
-                        }}
-                        className={inputStyles}
-                        placeholder="Enter mandatory action"
-                      />
                       <button
-                        onClick={() => {
-                          const newActions = formData.mandatory_actions.filter((_, i) => i !== index);
-                          handleInputChange('mandatory_actions', newActions);
-                        }}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-              <button
-                onClick={() => {
-                  const newActions = [...formData.mandatory_actions, ''];
-                  handleInputChange('mandatory_actions', newActions);
-                }}
-                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
+                onClick={handleSubmit}
+                className={`${buttonStyles} btn-primary`}
               >
-                <Plus className="w-4 h-4" />
-                <span>Add Mandatory Action</span>
-              </button>
-            </div>
-                <div className="space-y-2">
-              <Label htmlFor="optional_actions">Optional Actions</Label>
-              {formData.optional_actions.map((action, index) => (
-                <div key={index} className={cardStyles}>
-                  <button
-                    className="w-full flex items-center justify-between mb-4"
-                    onClick={() => toggleSection(`optional_${index}`)}
-                  >
-                    <span className="font-medium">{action || `Optional Action ${index + 1}`}</span>
-                    {expandedSections[`optional_${index}`] ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                  </button>
-                  
-                  {expandedSections[`optional_${index}`] && (
-                    <div className="space-y-4">
-                      <Input
-                        type="text"
-                        id={`optional_actions.${index}`}
-                        value={action}
-                        onChange={(e) => {
-                          const newActions = [...formData.optional_actions];
-                          newActions[index] = e.target.value;
-                          handleInputChange('optional_actions', newActions);
-                        }}
-                        className={inputStyles}
-                        placeholder="Enter optional action"
-                      />
-                      <button
-                        onClick={() => {
-                          const newActions = formData.optional_actions.filter((_, i) => i !== index);
-                          handleInputChange('optional_actions', newActions);
-                        }}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <X className="w-5 h-5" />
+                View Project
                       </button>
-                  </div>
-                  )}
-                  </div>
-              ))}
-              <button
-                onClick={() => {
-                  const newActions = [...formData.optional_actions, ''];
-                  handleInputChange('optional_actions', newActions);
-                }}
-                className={`${buttonStyles} btn-secondary flex items-center space-x-2`}
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Optional Action</span>
-              </button>
             </div>
           </div>
         );
@@ -2838,117 +3032,63 @@ Generated on: ${new Date().toLocaleString()}
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold">Create New Project</h1>
-          <p className="text-sm text-muted-foreground">
-            Complete the form below to create a new project
-                    </p>
-                  </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold">Project Wizard</h1>
+        <div className="flex items-center space-x-4">
         <Button
           variant="outline"
-          onClick={handleSaveDraft}
-          disabled={loading}
-          className="gap-2"
-        >
-          <FileText className="w-4 h-4" />
-          Save Draft
+            onClick={prevStep}
+            disabled={currentStep === 1}
+            className="flex items-center space-x-2"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span>Previous</span>
         </Button>
-                </div>
-      
-      <Card className="p-8">
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Progress Steps */}
-          <div className="relative mb-12">
-            {/* Progress Bar */}
-            <div className="absolute top-1/2 left-0 w-full h-1 bg-secondary transform -translate-y-1/2">
-              <div 
-                className="h-full bg-fire transition-all duration-300 rounded-full"
-                style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
-              />
-            </div>
-
-            {/* Step Buttons */}
-            <div className="relative flex justify-between">
-              {Array.from({ length: totalSteps }, (_, i) => (
-                <button
-                  key={i}
-                  className="group flex flex-col items-center"
-                  onClick={() => handleStepClick(i + 1)}
-                >
-                  {/* Step Circle */}
-                  <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300
-                      ${currentStep >= i + 1 
-                        ? 'bg-fire text-white shadow-lg shadow-fire/30' 
-                        : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
-                      }
-                      ${currentStep === i + 1 && 'ring-4 ring-fire/20'}
-                    `}
-                  >
-                    {currentStep > i + 1 ? (
-                      <Check className="w-6 h-6" />
-                    ) : (
-                      <span className="text-lg font-medium">{i + 1}</span>
+          {currentStep === 7 ? (
+            <Button
+              onClick={handleSubmit}
+              className="flex items-center space-x-2"
+            >
+              <span>Create Project</span>
+            </Button>
+          ) : (
+            <Button
+              onClick={nextStep}
+              className="flex items-center space-x-2"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
                     )}
                   </div>
-                  
-                  {/* Step Label - Only show for current step */}
-                  {currentStep === i + 1 && (
-                    <div className="absolute top-16 left-1/2 transform -translate-x-1/2">
-                      <div className="px-4 py-2 rounded-lg text-sm font-medium bg-fire/10 text-fire shadow-lg whitespace-nowrap">
-                        {[
-                          "Project Setup",
-                          "Occupancy Classification",
-                          "Facility Overview",
-                          "Commodity Classification",
-                          "Fire Protection Systems",
-                          "Special Risks & Mitigation",
-                          "Final Summary"
-                        ][i]}
               </div>
-            </div>
-          )}
+
+      <div className="flex space-x-8">
+        {/* Steps Navigation */}
+        <div className="w-64">
+          <div className="space-y-2">
+            {steps.map((step) => (
+              <button
+                key={step.id}
+                onClick={() => handleStepClick(step.id)}
+                className={`w-full text-left px-4 py-2 rounded-md ${
+                  currentStep === step.id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-muted'
+                }`}
+              >
+                {step.name}
                 </button>
               ))}
             </div>
           </div>
           
           {/* Step Content */}
-          <div className="min-h-[400px]">
+        <div className="flex-1">
             {renderStep()}
           </div>
-          
-          {/* Navigation Buttons */}
-          <div className="flex items-center justify-between pt-6 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={prevStep}
-              disabled={currentStep === 1}
-              className="gap-2"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Previous
-            </Button>
-            {currentStep === totalSteps ? (
-              <Button type="submit" className="gap-2">
-                Create Project
-              </Button>
-            ) : (
-              <Button
-                type="button"
-              onClick={nextStep}
-                className="gap-2"
-            >
-              Next
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            )}
           </div>
-        </form>
-      </Card>
     </div>
   );
 };

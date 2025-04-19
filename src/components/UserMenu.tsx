@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from '@/contexts/UserContext';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -27,16 +27,20 @@ import { cn } from '@/lib/utils';
 
 const UserMenu = () => {
   const navigate = useNavigate();
-  const { userDetails, setUser } = useUser();
+  const { user } = useUser();
+  const { signOut } = useAuth();
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
-      setUser(null);
+      await signOut();
+      
+      // Navigate to auth page
       navigate('/auth');
+      
       toast.success('Logged out successfully');
-    } catch (error) {
-      toast.error('Failed to logout');
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      toast.error(error.message || 'Failed to logout');
     }
   };
 
@@ -53,9 +57,9 @@ const UserMenu = () => {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-secondary/80">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={userDetails?.avatar_url} />
+            <AvatarImage src={user?.avatar_url} />
             <AvatarFallback className="bg-fire/10 text-fire">
-              {getUserInitials(userDetails?.full_name || 'U')}
+              {getUserInitials(user?.full_name || 'U')}
             </AvatarFallback>
           </Avatar>
         </Button>
@@ -69,9 +73,9 @@ const UserMenu = () => {
       >
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{userDetails?.full_name || 'User'}</p>
+            <p className="text-sm font-medium leading-none">{user?.full_name || 'User'}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {userDetails?.email || ''}
+              {user?.email || ''}
             </p>
           </div>
         </DropdownMenuLabel>

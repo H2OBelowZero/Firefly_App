@@ -18,6 +18,7 @@ import Calendar from '@/pages/Calendar';
 import Templates from '@/pages/Templates';
 import Resources from '@/pages/Resources';
 import NotFound from '@/pages/NotFound';
+import VerifyEmail from '@/pages/VerifyEmail';
 import PrivateRoute from '@/components/PrivateRoute';
 import DashboardLayout from '@/components/DashboardLayout';
 
@@ -32,6 +33,7 @@ function App() {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/verify-email" element={<VerifyEmail />} />
                   <Route
                     path="/dashboard"
                     element={

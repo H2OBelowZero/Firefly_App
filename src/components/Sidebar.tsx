@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Home, Clipboard, MapPin, FileText, Users, Settings, BookOpen, X, User, LogOut, MessageSquare, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUser } from '@/contexts/UserContext';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -81,7 +81,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedSansDoc, onSansDocChange, isO
   const [sansDocsExpanded, setSansDocsExpanded] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, userDetails, setUser } = useUser();
+  const { user } = useUser();
+  const { signOut } = useAuth();
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -89,12 +90,15 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedSansDoc, onSansDocChange, isO
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
-      setUser(null);
+      await signOut();
+      
+      // Navigate to auth page
       navigate('/auth');
+      
       toast.success('Logged out successfully');
-    } catch (error) {
-      toast.error('Failed to logout');
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      toast.error(error.message || 'Failed to logout');
     }
   };
 
@@ -107,8 +111,24 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedSansDoc, onSansDocChange, isO
   };
 
   return (
-    <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] bg-background border-r border-border shadow-xl transition-all duration-300 z-50 ${isOpen ? 'w-64' : 'w-16'}`}>
+    <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] bg-background border-r border-border shadow-xl transition-all duration-300 ${isOpen ? 'w-64' : 'w-16'}`}>
       <div className="h-full flex flex-col">
+        {/* Toggle Button */}
+        <div className="absolute -right-3 top-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 rounded-full border border-border bg-background shadow-sm hover:bg-accent"
+            onClick={onToggle}
+          >
+            {isOpen ? (
+              <ChevronLeft className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+
         {/* Create Button */}
         <div className="p-4 border-b border-border">
           <Link to="/project-wizard">
@@ -126,7 +146,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedSansDoc, onSansDocChange, isO
             <Link 
               to="/dashboard" 
               className={cn(
-                "flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                "flex items-center p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                isOpen ? "space-x-3" : "justify-center",
                 isActive('/dashboard') && "bg-fire/10 text-fire"
               )}
             >
@@ -136,7 +157,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedSansDoc, onSansDocChange, isO
             <Link 
               to="/projects" 
               className={cn(
-                "flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                "flex items-center p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                isOpen ? "space-x-3" : "justify-center",
                 isActive('/projects') && "bg-fire/10 text-fire"
               )}
             >
@@ -146,7 +168,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedSansDoc, onSansDocChange, isO
             <Link 
               to="/calendar" 
               className={cn(
-                "flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                "flex items-center p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                isOpen ? "space-x-3" : "justify-center",
                 isActive('/calendar') && "bg-fire/10 text-fire"
               )}
             >
@@ -156,7 +179,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedSansDoc, onSansDocChange, isO
             <Link 
               to="/templates" 
               className={cn(
-                "flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                "flex items-center p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                isOpen ? "space-x-3" : "justify-center",
                 isActive('/templates') && "bg-fire/10 text-fire"
               )}
             >
@@ -166,7 +190,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedSansDoc, onSansDocChange, isO
             <Link 
               to="/resources" 
               className={cn(
-                "flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                "flex items-center p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                isOpen ? "space-x-3" : "justify-center",
                 isActive('/resources') && "bg-fire/10 text-fire"
               )}
             >
@@ -176,7 +201,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedSansDoc, onSansDocChange, isO
             <Link 
               to="/team" 
               className={cn(
-                "flex items-center space-x-3 p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                "flex items-center p-3 rounded-2xl hover:bg-secondary/80 transition-all duration-200",
+                isOpen ? "space-x-3" : "justify-center",
                 isActive('/team') && "bg-fire/10 text-fire"
               )}
             >

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 const Navbar = () => {
-  const { user, userDetails } = useUser();
+  const { user, profile } = useUser();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 

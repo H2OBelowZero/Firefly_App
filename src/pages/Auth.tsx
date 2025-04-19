@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import AuthForm from "../components/AuthForm";
@@ -99,7 +98,7 @@ const Auth = () => {
             </div>
             
             <div className="w-full md:w-1/2 animate-fade-in animate-delay-300">
-              <AuthForm isRegister={isRegister} onToggleMode={toggleMode} />
+              <AuthForm mode={isRegister ? 'signup' : 'signin'} onToggleMode={toggleMode} />
             </div>
           </div>
         </div>
@@ -110,7 +109,7 @@ const Auth = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-sm text-muted-foreground">
-              © 2023 FirePlan. All rights reserved.
+              © 2023 FireFly. All rights reserved.
             </p>
             <div className="flex space-x-4 mt-4 md:mt-0">
               <Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground">

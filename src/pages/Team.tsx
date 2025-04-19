@@ -18,7 +18,7 @@ interface TeamMember {
 }
 
 const Team = () => {
-  const { userDetails } = useUser();
+  const { profile } = useUser();
   const [teamMembers, setTeamMembers] = React.useState<TeamMember[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -34,7 +34,7 @@ const Team = () => {
       const { data, error } = await supabase
         .from('team_members')
         .select('*')
-        .eq('company_id', userDetails?.company_id)
+        .eq('company_id', profile?.company_id)
         .order('full_name');
 
       if (error) throw error;
@@ -54,8 +54,8 @@ const Team = () => {
           {
             email: inviteEmail,
             role: inviteRole,
-            company_id: userDetails?.company_id,
-            invited_by: userDetails?.id,
+            company_id: profile?.company_id,
+            invited_by: profile?.id,
           },
         ]);
 

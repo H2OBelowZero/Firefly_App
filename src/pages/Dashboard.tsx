@@ -20,7 +20,7 @@ interface UpcomingEvent {
 
 const Dashboard = () => {
   const { projects, loading: projectsLoading } = useProjects();
-  const { userDetails } = useUser();
+  const { profile } = useUser();
   const [upcomingEvents, setUpcomingEvents] = React.useState<UpcomingEvent[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -58,7 +58,7 @@ const Dashboard = () => {
             name
           )
         `)
-        .eq('user_id', userDetails?.id)
+        .eq('user_id', profile?.id)
         .gte('due_date', new Date().toISOString())
         .order('due_date', { ascending: true })
         .limit(5);

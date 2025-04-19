@@ -3,56 +3,79 @@ import { Eye, EyeOff, ArrowRight, Lock, Mail, User, Building } from "lucide-reac
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/UserContext';
+import { Database } from '../types/database.types';
+
+type Profile = Database['public']['Tables']['profiles']['Row'];
 
 interface AuthFormProps {
-  isRegister: boolean;
+  mode: 'signin' | 'signup';
   onToggleMode: () => void;
 }
 
-const AuthForm: React.FC<AuthFormProps> = ({ isRegister, onToggleMode }) => {
+const AuthForm: React.FC<AuthFormProps> = ({ mode, onToggleMode }) => {
   const navigate = useNavigate();
+  const { signIn, signUp, user } = useAuth();
+  const { updateProfile, createProfile } = useUser();
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [company, setCompany] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    company: '',
+  });
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setLoading(true);
 
     try {
-      if (isRegister) {
+      if (mode === 'signup') {
+        console.log('Starting signup process with email:', formData.email);
+        
+        // Sign up the user with metadata
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
+          email: formData.email,
+          password: formData.password,
           options: {
             data: {
-              full_name: name,
-              company: company,
-            },
-          },
+              full_name: formData.full_name,
+              company: formData.company,
+              role: 'user'
+            }
+          }
         });
-
-        if (signUpError) throw signUpError;
-
-        toast.success("Registration successful! Please check your email for verification.");
+        
+        if (signUpError) {
+          console.error('Signup error:', signUpError);
+          throw signUpError;
+        }
+        
+        console.log('Signup response:', signUpData);
+        
+        // Check if email confirmation is required
+        if (signUpData.user && !signUpData.user.confirmed_at) {
+          console.log('Email confirmation required');
+          toast.success('Please check your email to confirm your account');
+          navigate('/auth/verify-email');
+          return;
+        }
+        
+        // If we get here, the user is already confirmed
+        toast.success('Account created successfully!');
+        navigate('/dashboard');
       } else {
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (signInError) throw signInError;
-
-        toast.success("Successfully signed in!");
-        navigate("/dashboard");
+        await signIn(formData.email, formData.password);
+        toast.success('Signed in successfully!');
+        navigate('/dashboard');
       }
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      toast.error((error as Error).message);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -72,13 +95,13 @@ const AuthForm: React.FC<AuthFormProps> = ({ isRegister, onToggleMode }) => {
   };
 
   const handleForgotPassword = async () => {
-    if (!email) {
+    if (!formData.email) {
       toast.error("Please enter your email address");
       return;
     }
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
 
@@ -90,33 +113,41 @@ const AuthForm: React.FC<AuthFormProps> = ({ isRegister, onToggleMode }) => {
     }
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
   return (
     <div className="w-full max-w-md mx-auto glass-card p-8">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold mb-2">
-          {isRegister ? "Create an Account" : "Welcome Back"}
+          {mode === 'signup' ? "Create an Account" : "Welcome Back"}
         </h2>
         <p className="text-muted-foreground text-sm">
-          {isRegister
+          {mode === 'signup'
             ? "Join thousands of fire engineers in South Africa"
-            : "Sign in to your FirePlan account"}
+            : "Sign in to your FireFly account"}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {isRegister && (
+        {mode === 'signup' && (
           <>
             <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
+              <label htmlFor="full_name" className="text-sm font-medium">
                 Full Name
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <input
-                  id="name"
+                  id="full_name"
+                  name="full_name"
                   type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={formData.full_name}
+                  onChange={handleChange}
                   className="input-field pl-10"
                   placeholder="Enter your full name"
                   required
@@ -132,9 +163,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ isRegister, onToggleMode }) => {
                 <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <input
                   id="company"
+                  name="company"
                   type="text"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
+                  value={formData.company}
+                  onChange={handleChange}
                   className="input-field pl-10"
                   placeholder="Your company or organization"
                   required
@@ -152,9 +184,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ isRegister, onToggleMode }) => {
             <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <input
               id="email"
+              name="email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={formData.email}
+              onChange={handleChange}
               className="input-field pl-10"
               placeholder="name@example.com"
               required
@@ -167,7 +200,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ isRegister, onToggleMode }) => {
             <label htmlFor="password" className="text-sm font-medium">
               Password
             </label>
-            {!isRegister && (
+            {mode === 'signin' && (
               <button
                 type="button"
                 onClick={handleForgotPassword}
@@ -181,11 +214,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ isRegister, onToggleMode }) => {
             <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <input
               id="password"
+              name="password"
               type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={formData.password}
+              onChange={handleChange}
               className="input-field pl-10"
-              placeholder={isRegister ? "Create a password" : "Enter your password"}
+              placeholder={mode === 'signup' ? "Create a password" : "Enter your password"}
               required
             />
             <button
@@ -205,13 +239,13 @@ const AuthForm: React.FC<AuthFormProps> = ({ isRegister, onToggleMode }) => {
         <button
           type="submit"
           className="btn-primary w-full bg-fire text-white hover:bg-fire/90 flex items-center justify-center"
-          disabled={isLoading}
+          disabled={loading}
         >
-          {isLoading ? (
+          {loading ? (
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
           ) : (
             <>
-              {isRegister ? "Create Account" : "Sign In"}
+              {mode === 'signup' ? "Create Account" : "Sign In"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </>
           )}
@@ -220,16 +254,16 @@ const AuthForm: React.FC<AuthFormProps> = ({ isRegister, onToggleMode }) => {
 
       <div className="mt-6 text-center text-sm">
         <span className="text-muted-foreground">
-          {isRegister ? "Already have an account?" : "Don't have an account?"}
-        </span>{" "}
+          {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}
+        </span>{' '}
         <button
+          type="button"
           onClick={onToggleMode}
           className="text-primary hover:text-primary/80 font-medium"
         >
-          {isRegister ? "Sign in" : "Create an account"}
+          {mode === 'signup' ? 'Sign in' : 'Create an account'}
         </button>
       </div>
- 
     </div>
   );
 };

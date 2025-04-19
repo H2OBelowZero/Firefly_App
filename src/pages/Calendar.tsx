@@ -15,7 +15,7 @@ interface Deadline {
 }
 
 const Calendar = () => {
-  const { userDetails } = useUser();
+  const { profile } = useUser();
   const [deadlines, setDeadlines] = React.useState<Deadline[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
@@ -29,7 +29,7 @@ const Calendar = () => {
       const { data, error } = await supabase
         .from('deadlines')
         .select('*')
-        .eq('user_id', userDetails?.id)
+        .eq('user_id', profile?.id)
         .order('due_date', { ascending: true });
 
       if (error) throw error;

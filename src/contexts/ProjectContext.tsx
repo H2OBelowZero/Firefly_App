@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface Project {
   id: string;
-  name: string;
+  company_name: string;
   client_name: string;
   created_at: string;
   updated_at: string;
@@ -15,6 +15,7 @@ interface ProjectContextType {
   loading: boolean;
   error: string | null;
   refreshProjects: () => Promise<void>;
+  deleteProject: (projectId: string) => Promise<boolean>;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -41,6 +42,66 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteProject = async (projectId: string): Promise<boolean> => {
+    try {
+      setLoading(true);
+      
+      // Delete related records first
+      const tables = [
+        'facility_locations',
+        'buildings',
+        'expected_commodities',
+        'zones',
+        'special_risks',
+        'divisional_separations',
+        'fire_alarm_panels',
+        'escape_routes',
+        'emergency_staircases',
+        'signage_items',
+        'emergency_lighting_zones',
+        'fire_hose_reels',
+        'fire_extinguishers',
+        'fire_hydrants',
+        'firewater',
+        'fire_detection',
+        'smoke_ventilation_zones',
+        'mandatory_actions',
+        'optional_actions',
+        'engineer_signoff',
+        'occupancy_separation',
+        'automatic_fire_extinguishment_areas'
+      ];
+      
+      for (const table of tables) {
+        const { error } = await supabase
+          .from(table)
+          .delete()
+          .eq('project_id', projectId);
+          
+        if (error) {
+          console.error(`Error deleting from ${table}:`, error);
+        }
+      }
+      
+      // Finally delete the project
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setProjects(projects.filter(project => project.id !== projectId));
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
   }, []);
@@ -50,6 +111,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     loading,
     error,
     refreshProjects: fetchProjects,
+    deleteProject
   };
 
   return (

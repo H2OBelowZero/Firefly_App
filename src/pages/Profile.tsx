@@ -19,15 +19,15 @@ interface Activity {
 }
 
 const Profile = () => {
-  const { userDetails, setUserDetails } = useUser();
+  const { profile, setProfile } = useUser();
   const [loading, setLoading] = React.useState(false);
   const [formData, setFormData] = React.useState({
-    full_name: userDetails?.full_name || '',
-    email: userDetails?.email || '',
-    phone: userDetails?.phone || '',
-    company: userDetails?.company || '',
-    role: userDetails?.role || '',
-    address: userDetails?.address || ''
+    full_name: profile?.full_name || '',
+    email: profile?.email || '',
+    phone: profile?.phone || '',
+    company: profile?.company || '',
+    role: profile?.role || '',
+    address: profile?.address || ''
   });
 
   const [activities] = React.useState<Activity[]>([
@@ -62,12 +62,12 @@ const Profile = () => {
       const { error } = await supabase
         .from('profiles')
         .update(formData)
-        .eq('id', userDetails?.id);
+        .eq('id', profile?.id);
 
       if (error) throw error;
 
-      setUserDetails({
-        ...userDetails,
+      setProfile({
+        ...profile,
         ...formData
       });
 
@@ -103,9 +103,9 @@ const Profile = () => {
                 <div className="flex items-center space-x-6 mb-6">
                   <div className="relative">
                     <Avatar className="h-24 w-24">
-                      <AvatarImage src={userDetails?.avatar_url} />
+                      <AvatarImage src={profile?.avatar_url} />
                       <AvatarFallback className="bg-fire/10 text-fire text-2xl">
-                        {userDetails?.full_name?.split(' ').map(n => n[0]).join('')}
+                        {profile?.full_name?.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
                     <Button
@@ -117,8 +117,8 @@ const Profile = () => {
                     </Button>
                   </div>
                   <div>
-                    <h2 className="text-2xl font-semibold">{userDetails?.full_name}</h2>
-                    <p className="text-muted-foreground">{userDetails?.role}</p>
+                    <h2 className="text-2xl font-semibold">{profile?.full_name}</h2>
+                    <p className="text-muted-foreground">{profile?.role}</p>
                   </div>
                 </div>
 
@@ -225,7 +225,7 @@ const Profile = () => {
                 <Mail className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <div className="text-sm font-medium">Email</div>
-                  <div className="text-sm text-muted-foreground">{userDetails?.email}</div>
+                  <div className="text-sm text-muted-foreground">{profile?.email}</div>
                 </div>
               </div>
 
@@ -233,7 +233,7 @@ const Profile = () => {
                 <Phone className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <div className="text-sm font-medium">Phone</div>
-                  <div className="text-sm text-muted-foreground">{userDetails?.phone || 'Not set'}</div>
+                  <div className="text-sm text-muted-foreground">{profile?.phone || 'Not set'}</div>
                 </div>
               </div>
 
@@ -241,7 +241,7 @@ const Profile = () => {
                 <Building2 className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <div className="text-sm font-medium">Company</div>
-                  <div className="text-sm text-muted-foreground">{userDetails?.company || 'Not set'}</div>
+                  <div className="text-sm text-muted-foreground">{profile?.company || 'Not set'}</div>
                 </div>
               </div>
 
@@ -249,7 +249,7 @@ const Profile = () => {
                 <MapPin className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <div className="text-sm font-medium">Address</div>
-                  <div className="text-sm text-muted-foreground">{userDetails?.address || 'Not set'}</div>
+                  <div className="text-sm text-muted-foreground">{profile?.address || 'Not set'}</div>
                 </div>
               </div>
             </div>

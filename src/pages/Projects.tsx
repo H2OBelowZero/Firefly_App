@@ -4,17 +4,59 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Search, Filter, MoreVertical } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, Trash2 } from 'lucide-react';
 import { useProjects } from '@/contexts/ProjectContext';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Projects = () => {
-  const { projects, loading } = useProjects();
+  const { projects, loading, deleteProject } = useProjects();
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    project.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.client_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleDeleteClick = (projectId: string) => {
+    setProjectToDelete(projectId);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const success = await deleteProject(projectToDelete);
+      if (success) {
+        toast.success('Project deleted successfully');
+      } else {
+        toast.error('Failed to delete project');
+      }
+    } catch (error) {
+      toast.error('An error occurred while deleting the project');
+    } finally {
+      setIsDeleting(false);
+      setProjectToDelete(null);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -54,18 +96,36 @@ const Projects = () => {
         ) : filteredProjects.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProjects.map((project) => (
-              <Link key={project.id} to={`/projects/${project.id}`}>
-                <Card className="p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="h-10 w-10 rounded-2xl bg-fire/10 flex items-center justify-center">
-                      <span className="font-bold text-fire">FF</span>
-                    </div>
-                    <MoreVertical className="w-5 h-5 text-muted-foreground" />
+              <Card key={project.id} className="p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="h-10 w-10 rounded-2xl bg-fire/10 flex items-center justify-center">
+                    <span className="font-bold text-fire">FF</span>
                   </div>
-                  <h3 className="font-medium mb-2">{project.name}</h3>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="w-5 h-5 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <Link to={`/projects/${project.id}`}>
+                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                      </Link>
+                      <DropdownMenuItem 
+                        className="text-fire focus:text-fire"
+                        onClick={() => handleDeleteClick(project.id)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <Link to={`/projects/${project.id}`}>
+                  <h3 className="font-medium mb-2">{project.company_name}</h3>
                   <p className="text-sm text-muted-foreground">{project.client_name}</p>
-                </Card>
-              </Link>
+                </Link>
+              </Card>
             ))}
           </div>
         ) : (
@@ -83,6 +143,36 @@ const Projects = () => {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!projectToDelete} onOpenChange={() => setProjectToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the project
+              and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete} 
+              className="bg-fire hover:bg-fire/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Deleting...
+                </div>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
