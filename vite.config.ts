@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
+import react from "@vitejs/plugin-react";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import fs from 'fs';
@@ -44,14 +44,23 @@ export default defineConfig(({ mode }) => ({
       cert: fs.readFileSync(path.resolve(__dirname, '.cert/cert.pem')),
     },
   },
-  plugins: [
-    react(),
-    mode === 'development' &&
-    componentTagger(),
-  ].filter(Boolean),
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    include: ['docx'],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
+  },
+  build: {
+    commonjsOptions: {
+      include: [/docx/, /node_modules/]
+    }
+  }
 }));
