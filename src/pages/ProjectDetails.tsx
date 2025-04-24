@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Document, Paragraph, Table, TableRow, TableCell, WidthType, HeadingLevel, Packer } from 'docx';
 
 interface Project {
   id: string;
@@ -261,80 +260,183 @@ const ProjectDetails: React.FC = () => {
   }, [id]);
 
   const handleExportToWord = async () => {
-    if (!project) return;
+    if (!project) {
+      toast.error('No project data available to export.');
+      return;
+    }
 
     try {
-      // Create a new Document
-      const doc = new Document({
-        sections: [{
-          properties: {},
-          children: [
-            new Paragraph({
-              text: "Project Report",
-              heading: HeadingLevel.HEADING_1,
-            }),
-            new Paragraph({
-              text: "Project Overview",
-              heading: HeadingLevel.HEADING_2,
-            }),
-            new Table({
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph("Company Name")] }),
-                    new TableCell({ children: [new Paragraph(project.company_name)] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph("Client Name")] }),
-                    new TableCell({ children: [new Paragraph(project.client_name)] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph("Facility Process")] }),
-                    new TableCell({ children: [new Paragraph(project.facility_process)] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph("Location")] }),
-                    new TableCell({ children: [new Paragraph(`${project.facility_location.town}, ${project.facility_location.province}`)] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph("Construction Year")] }),
-                    new TableCell({ children: [new Paragraph(project.construction_year.toString())] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph("Status")] }),
-                    new TableCell({ children: [new Paragraph(project.status)] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph("Last Updated")] }),
-                    new TableCell({ children: [new Paragraph(new Date(project.updated_at).toLocaleDateString())] }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        }],
-      });
+      // Create a text content with project data
+      const textContent = `
+Project Report
+=============
 
-      // Generate the document
-      const buffer = await Packer.toBlob(doc);
+Project Overview
+---------------
+Company Name: ${project.company_name || 'N/A'}
+Client Name: ${project.client_name || 'N/A'}
+Facility Process: ${project.facility_process || 'N/A'}
+Location: ${project.facility_location?.town || 'N/A'}, ${project.facility_location?.province || 'N/A'}
+Construction Year: ${project.construction_year || 'N/A'}
+Status: ${project.status || 'N/A'}
+Last Updated: ${project.updated_at ? new Date(project.updated_at).toLocaleDateString() : 'N/A'}
+
+Buildings
+---------
+${project.buildings?.map(building => `
+Building Name: ${building.name || 'N/A'}
+Classification: ${building.classification || 'N/A'}
+Total Area: ${building.total_building_area || 'N/A'}m²
+Construction Materials: ${Object.entries(building.construction_materials || {})
+  .filter(([_, value]) => value === true)
+  .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1))
+  .join(', ')}${building.construction_materials?.other ? `, ${building.construction_materials.other}` : ''}
+`).join('\n') || 'No buildings data available'}
+
+Zones
+-----
+${project.zones?.map(zone => `
+Zone Name: ${zone.name || 'N/A'}
+Classification: ${zone.classification || 'N/A'}
+Area: ${zone.area || 'N/A'}m²
+Occupancy Type: ${zone.occupancy_type || 'N/A'}
+`).join('\n') || 'No zones data available'}
+
+Fire Protection Systems
+----------------------
+${project.fire_protection_systems?.map(system => `
+System Type: ${system.type || 'N/A'}
+Description: ${system.description || 'N/A'}
+Coverage: ${system.coverage || 'N/A'}
+Maintenance Status: ${system.maintenance_status || 'N/A'}
+`).join('\n') || 'No fire protection systems data available'}
+
+Special Risks
+------------
+${project.special_risks?.map(risk => `
+Risk Type: ${risk.risk_type || 'N/A'}
+Location: ${risk.location || 'N/A'}
+Details: ${risk.details || 'N/A'}
+`).join('\n') || 'No special risks data available'}
+
+Emergency Procedures
+------------------
+${project.emergency_procedures?.map(procedure => `
+Type: ${procedure.type || 'N/A'}
+Description: ${procedure.description || 'N/A'}
+Responsible Person: ${procedure.responsible_person || 'N/A'}
+Contact Number: ${procedure.contact_number || 'N/A'}
+`).join('\n') || 'No emergency procedures data available'}
+
+Automatic Fire Extinguishment Areas
+--------------------------------
+${project.automatic_fire_extinguishment_areas?.map(area => `
+Area Name: ${area.name || 'N/A'}
+Commodity: ${area.commodity_name || 'N/A'}
+Maximum Stacking Height: ${area.maximum_stacking_height || 'N/A'}m
+`).join('\n') || 'No automatic fire extinguishment areas data available'}
+
+Occupancy Separations
+-------------------
+Separation Type: ${project.occupancy_separations?.separation_type || 'N/A'}
+Rating: ${project.occupancy_separations?.rating || 'N/A'}
+
+Divisional Separations
+--------------------
+Fire Rated Walls: ${project.divisional_separations?.fire_rated_walls ? 'Yes' : 'No'}
+Fire Rated Doors: ${project.divisional_separations?.fire_rated_doors ? 'Yes' : 'No'}
+
+Escape Routes
+------------
+${project.escape_routes?.map(route => `
+Route Name: ${route.name || 'N/A'}
+Travel Distance: ${route.travel_distance || 'N/A'}m
+Width: ${route.width || 'N/A'}m
+`).join('\n') || 'No escape routes data available'}
+
+Emergency Staircases
+------------------
+${project.emergency_staircases?.map(staircase => `
+Staircase Name: ${staircase.name || 'N/A'}
+Width: ${staircase.width || 'N/A'}m
+Fire Rating: ${staircase.fire_rating || 'N/A'}
+Fire Rated: ${staircase.fire_rated ? 'Yes' : 'No'}
+`).join('\n') || 'No emergency staircases data available'}
+
+Signage Items
+------------
+${project.signage_items?.map(sign => `
+Sign Type: ${sign.sign_type || 'N/A'}
+Location: ${sign.location || 'N/A'}
+Photoluminescent: ${sign.photoluminescent || 'N/A'}
+`).join('\n') || 'No signage items data available'}
+
+Emergency Lighting Zones
+----------------------
+${project.emergency_lighting_zones?.map(zone => `
+Zone Name: ${zone.name || 'N/A'}
+Duration: ${zone.duration || 'N/A'} hours
+Lux Level: ${zone.lux_level || 'N/A'} lux
+`).join('\n') || 'No emergency lighting zones data available'}
+
+Fire Hose Reels
+--------------
+${project.fire_hose_reels?.map(reel => `
+Location: ${reel.location || 'N/A'}
+Hose Length: ${reel.hose_length || 'N/A'}m
+Coverage Radius: ${reel.coverage_radius || 'N/A'}m
+`).join('\n') || 'No fire hose reels data available'}
+
+Fire Extinguishers
+----------------
+${project.fire_extinguishers?.map(extinguisher => `
+Extinguisher Type: ${extinguisher.extinguisher_type || 'N/A'}
+Location: ${extinguisher.location || 'N/A'}
+Capacity: ${extinguisher.capacity || 'N/A'} liters
+`).join('\n') || 'No fire extinguishers data available'}
+
+Fire Hydrants
+------------
+${project.fire_hydrants?.map(hydrant => `
+Location: ${hydrant.location || 'N/A'}
+Hydrant Type: ${hydrant.hydrant_type || 'N/A'}
+Flow Rate: ${hydrant.flow_rate || 'N/A'} L/min
+`).join('\n') || 'No fire hydrants data available'}
+
+Firewater System
+--------------
+Source: ${project.firewater?.source || 'N/A'}
+Capacity: ${project.firewater?.capacity || 'N/A'} liters
+Pressure: ${project.firewater?.pressure || 'N/A'} bar
+
+Fire Detection System
+-------------------
+System Type: ${project.fire_detection?.system_type || 'N/A'}
+Number of Zones: ${project.fire_detection?.number_of_zones || 'N/A'}
+Battery Backup: ${project.fire_detection?.battery_backup || 'N/A'} hours
+
+Fire Alarm Panel
+--------------
+Panel Layout: ${project.fire_alarm_panel?.panel_layout || 'N/A'}
+Zone Name: ${project.fire_alarm_panel?.zone_name || 'N/A'}
+
+Smoke Ventilation Zones
+---------------------
+${project.smoke_ventilation_zones?.map(zone => `
+Zone Name: ${zone.name || 'N/A'}
+Area: ${zone.area || 'N/A'}m²
+Ventilation Rate: ${zone.ventilation_rate || 'N/A'} m³/h
+`).join('\n') || 'No smoke ventilation zones data available'}
+      `;
+
+      // Create a Blob with the text content
+      const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
       
       // Create download link and trigger download
-      const url = window.URL.createObjectURL(buffer);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${project.company_name.replace(/\s+/g, '_')}_Project_Report.docx`;
+      link.download = `${project.company_name?.replace(/\s+/g, '_') || 'Project'}_Report.txt`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -343,6 +445,10 @@ const ProjectDetails: React.FC = () => {
       toast.success('Project report exported successfully!');
     } catch (error) {
       console.error('Error exporting project:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       toast.error('Failed to export project report. Please try again.');
     }
   };
