@@ -31,7 +31,48 @@ export default defineConfig(({ mode }) => ({
     strictPort: true,
     cors: true,
     proxy: {
-      // Add any proxy configurations if needed
+      '/api': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('proxy error', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Sending Request to the Target:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+          });
+        },
+        ws: true,
+        timeout: 5000,
+        proxyTimeout: 5000
+      },
+      '/api/n8n-webhook': {
+        target: 'https://fireflyapp.app.n8n.cloud',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api\/n8n-webhook/, '/webhook-test/c3d9595b-21fc-475c-b223-cd20ac17f419'),
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('n8n proxy error', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Sending Request to n8n:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('Received Response from n8n:', proxyRes.statusCode, req.url);
+          });
+        },
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+          'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization'
+        }
+      },
     },
     watch: {
       usePolling: true,
@@ -51,7 +92,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    include: ['docx'],
+    include: ['docx', 'pdfjs-dist/build/pdf.worker.min.js'],
     esbuildOptions: {
       define: {
         global: 'globalThis'
@@ -60,7 +101,7 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     commonjsOptions: {
-      include: [/docx/, /node_modules/]
+      include: [/docx/, /node_modules/, /pdfjs-dist/]
     }
   }
 }));
