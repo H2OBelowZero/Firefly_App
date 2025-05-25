@@ -22,6 +22,7 @@ export interface Database {
           status: 'draft' | 'review' | 'approved' | 'rejected'
           facility_location_id: string
           updated_at: string
+          facility_location: string
         }
         Insert: {
           id?: string
@@ -35,6 +36,7 @@ export interface Database {
           status: 'draft' | 'review' | 'approved' | 'rejected'
           facility_location_id: string
           updated_at?: string
+          facility_location: string
         }
         Update: {
           id?: string
@@ -48,26 +50,7 @@ export interface Database {
           status?: 'draft' | 'review' | 'approved' | 'rejected'
           facility_location_id?: string
           updated_at?: string
-        }
-      }
-      facility_locations: {
-        Row: {
-          id: string
-          created_at: string
-          town: string
-          province: string
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          town: string
-          province: string
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          town?: string
-          province?: string
+          facility_location?: string
         }
       }
       buildings: {
@@ -79,6 +62,9 @@ export interface Database {
           total_building_area: number
           cad_drawing: string
           aerial_view: string
+          description: string
+          lower_wall_materials: string
+          upper_wall_materials: string
         }
         Insert: {
           id?: string
@@ -88,6 +74,9 @@ export interface Database {
           total_building_area: number
           cad_drawing: string
           aerial_view: string
+          description: string
+          lower_wall_materials: string
+          upper_wall_materials: string
         }
         Update: {
           id?: string
@@ -97,39 +86,17 @@ export interface Database {
           total_building_area?: number
           cad_drawing?: string
           aerial_view?: string
-        }
-      }
-      building_construction_materials: {
-        Row: {
-          id: string
-          brick: boolean
-          steel: boolean
-          concrete: boolean
-          timber: boolean
-          other: string | null
-        }
-        Insert: {
-          id?: string
-          brick: boolean
-          steel: boolean
-          concrete: boolean
-          timber: boolean
-          other?: string | null
-        }
-        Update: {
-          id?: string
-          brick?: boolean
-          steel?: boolean
-          concrete?: boolean
-          timber?: boolean
-          other?: string | null
+          description?: string
+          lower_wall_materials?: string
+          upper_wall_materials?: string
         }
       }
       expected_commodities: {
         Row: {
           id: string
-          created_at: string
+          created_at?: string
           project_id: string
+          area_id: string
           name: string
           category: string
           stacking_height: number
@@ -139,6 +106,7 @@ export interface Database {
           id?: string
           created_at?: string
           project_id: string
+          area_id: string
           name: string
           category: string
           stacking_height: number
@@ -148,79 +116,89 @@ export interface Database {
           id?: string
           created_at?: string
           project_id?: string
+          area_id?: string
           name?: string
           category?: string
           stacking_height?: number
           storage_type?: string
         }
       }
-      zones: {
+      rooms: {
         Row: {
           id: string
-          created_at: string
+          created_at?: string
           project_id: string
           name: string
+          description: string
+          area_id: string
+          photo: string
         }
         Insert: {
           id?: string
           created_at?: string
           project_id: string
           name: string
+          description: string
+          area_id: string
+          photo: string
         }
         Update: {
           id?: string
           created_at?: string
           project_id?: string
           name?: string
+          description?: string
+          area_id?: string
+          photo?: string
         }
       }
-      zone_photos: {
+      areas: {
         Row: {
           id: string
-          created_at: string
-          zone_id: string
-          photo_url: string
+          created_at?: string
+          project_id: string
+          building_id: string
+          name: string
         }
         Insert: {
           id?: string
           created_at?: string
-          zone_id: string
-          photo_url: string
+          project_id: string
+          building_id: string
+          name: string
         }
         Update: {
           id?: string
           created_at?: string
-          zone_id?: string
-          photo_url?: string
+          project_id?: string
+          building_id?: string
+          name?: string
         }
       }
       special_risks: {
         Row: {
           id: string
-          created_at: string
+          created_at?: string
           project_id: string
           risk_type: string
-          location: string
-          details: string
-          photo_url: string | null
+          photo: string | null
+          description: string
         }
         Insert: {
           id?: string
           created_at?: string
           project_id: string
           risk_type: string
-          location: string
-          details: string
-          photo_url?: string | null
+          photo: string | null
+          description: string
         }
         Update: {
           id?: string
           created_at?: string
           project_id?: string
           risk_type?: string
-          location?: string
-          details?: string
-          photo_url?: string | null
+          photo?: string | null
+          description?: string
         }
       }
       escape_routes: {
@@ -229,128 +207,38 @@ export interface Database {
           created_at: string
           project_id: string
           name: string
-          travel_distance: number
-          width: number
         }
         Insert: {
           id?: string
           created_at?: string
           project_id: string
           name: string
-          travel_distance: number
-          width: number
         }
         Update: {
           id?: string
           created_at?: string
           project_id?: string
           name?: string
-          travel_distance?: number
-          width?: number
         }
-      }
-      emergency_staircases: {
-        Row: {
-          id: string
-          created_at: string
-          project_id: string
-          name: string
-          width: number
-          fire_rated: boolean
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          project_id: string
-          name: string
-          width: number
-          fire_rated: boolean
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          project_id?: string
-          name?: string
-          width?: number
-          fire_rated?: boolean
-        }
-      }
-      signage_items: {
-        Row: {
-          id: string
-          created_at: string
-          project_id: string
-          sign_type: string
-          location: string
-          photoluminescent: boolean
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          project_id: string
-          sign_type: string
-          location: string
-          photoluminescent: boolean
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          project_id?: string
-          sign_type?: string
-          location?: string
-          photoluminescent?: boolean
-        }
-      }
-      emergency_lighting_zones: {
-        Row: {
-          id: string
-          created_at: string
-          project_id: string
-          name: string
-          duration: number
-          lux_level: number
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          project_id: string
-          name: string
-          duration: number
-          lux_level: number
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          project_id?: string
-          name?: string
-          duration?: number
-          lux_level?: number
-        }
-      }
+    }
       fire_hose_reels: {
         Row: {
           id: string
           created_at: string
           project_id: string
-          location: string
-          hose_length: number
-          coverage_radius: number
+          name: string
         }
         Insert: {
           id?: string
           created_at?: string
           project_id: string
-          location: string
-          hose_length: number
-          coverage_radius: number
+          name: string
         }
         Update: {
           id?: string
           created_at?: string
           project_id?: string
-          location?: string
-          hose_length?: number
-          coverage_radius?: number
+          name?: string
         }
       }
       fire_extinguishers: {
@@ -359,24 +247,18 @@ export interface Database {
           created_at: string
           project_id: string
           extinguisher_type: string
-          location: string
-          capacity: number
         }
         Insert: {
           id?: string
           created_at?: string
           project_id: string
           extinguisher_type: string
-          location: string
-          capacity: number
         }
         Update: {
           id?: string
           created_at?: string
           project_id?: string
           extinguisher_type?: string
-          location?: string
-          capacity?: number
         }
       }
       fire_hydrants: {
@@ -384,48 +266,19 @@ export interface Database {
           id: string
           created_at: string
           project_id: string
-          location: string
-          hydrant_type: string
-          flow_rate: number
+          name: string
         }
         Insert: {
           id?: string
           created_at?: string
           project_id: string
-          location: string
-          hydrant_type: string
-          flow_rate: number
+          name: string
         }
         Update: {
           id?: string
           created_at?: string
           project_id?: string
-          location?: string
-          hydrant_type?: string
-          flow_rate?: number
-        }
-      }
-      firewater: {
-        Row: {
-          id: string
-          created_at: string
-          source: string
-          capacity: number
-          pressure: number
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          source: string
-          capacity: number
-          pressure: number
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          source?: string
-          capacity?: number
-          pressure?: number
+          name?: string
         }
       }
       fire_detection: {
@@ -433,204 +286,65 @@ export interface Database {
           id: string
           created_at: string
           system_type: string
-          number_of_zones: number
-          battery_backup: number
+          alarm_panel_photo: string
         }
         Insert: {
           id?: string
           created_at?: string
           system_type: string
-          number_of_zones: number
-          battery_backup: number
+          alarm_panel_photo: string
         }
         Update: {
           id?: string
           created_at?: string
           system_type?: string
-          number_of_zones?: number
-          battery_backup?: number
+          alarm_panel_photo?: string
         }
       }
-      fire_alarm_panel: {
+      separations: {
         Row: {
           id: string
-          created_at: string
-          panel_layout: string
-          zone_name: string
-        }
-        Insert: {
-          id?: string
           created_at?: string
-          panel_layout: string
-          zone_name: string
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          panel_layout?: string
-          zone_name?: string
-        }
-      }
-      smoke_ventilation_zones: {
-        Row: {
-          id: string
-          created_at: string
           project_id: string
-          name: string
-          area: number
-          ventilation_rate: number
+          first_building_id: string
+          second_building_id: string
+          first_area_id: string
+          second_area_id: string
         }
         Insert: {
           id?: string
           created_at?: string
           project_id: string
-          name: string
-          area: number
-          ventilation_rate: number
+          first_building_id: string
+          second_building_id: string
+          first_area_id: string
+          second_area_id: string
         }
         Update: {
           id?: string
           created_at?: string
           project_id?: string
-          name?: string
-          area?: number
-          ventilation_rate?: number
-        }
-      }
-      mandatory_actions: {
-        Row: {
-          id: string
-          created_at: string
-          project_id: string
-          description: string
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          project_id: string
-          description: string
-        }
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          project_id?: string
-          description?: string
-        }
-      }
-      optional_actions: {
-        Row: {
-          id: string
-          created_at: string
-          project_id: string
-          description: string
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          project_id: string
-          description: string
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          project_id?: string
-          description?: string
-        }
-      }
-      engineer_signoff: {
-        Row: {
-          id: string
-          created_at: string
-          project_id: string
-          engineer_name: string
-          license_number: string
-          date: string
-          comments: string
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          project_id: string
-          engineer_name: string
-          license_number: string
-          date: string
-          comments: string
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          project_id?: string
-          engineer_name?: string
-          license_number?: string
-          date?: string
-          comments?: string
-        }
-      }
-      occupancy_separations: {
-        Row: {
-          id: string
-          created_at: string
-          separation_type: string
-          rating: number
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          separation_type: string
-          rating: number
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          separation_type?: string
-          rating?: number
-        }
-      }
-      divisional_separations: {
-        Row: {
-          id: string
-          created_at: string
-          fire_rated_walls: boolean
-          fire_rated_doors: boolean
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          fire_rated_walls: boolean
-          fire_rated_doors: boolean
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          fire_rated_walls?: boolean
-          fire_rated_doors?: boolean
+          first_building_id?: string
+          second_building_id?: string
+          first_area_id?: string
+          second_area_id?: string
         }
       }
       automatic_fire_extinguishment_areas: {
         Row: {
           id: string
-          created_at: string
           project_id: string
-          name: string
-          commodity_name: string
-          maximum_stacking_height: number
+          area_id: string
         }
         Insert: {
           id?: string
-          created_at?: string
           project_id: string
-          name: string
-          commodity_name: string
-          maximum_stacking_height: number
+          area_id: string
         }
         Update: {
           id?: string
-          created_at?: string
           project_id?: string
-          name?: string
-          commodity_name?: string
-          maximum_stacking_height?: number
+          area_id?: string
         }
       }
       profiles: {

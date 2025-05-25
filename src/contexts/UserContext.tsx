@@ -69,10 +69,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // Profile not found, create a mock profile from auth user
-          console.log('Profile not found, using auth user data');
-          setUser({
+        if (error.code === 'PGRST116' || error.code === '406') {
+          // Profile not found or not acceptable, create a mock profile from auth user
+          console.log('Profile not found or not acceptable, using auth user data');
+          const mockProfile = {
             id: authUser?.id || '',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -85,7 +85,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             address: null,
             notifications_enabled: true,
             dark_mode: false
-          } as Profile);
+          } as Profile;
+
+          // Try to create the profile
+          const { error: createError } = await supabase
+            .from('profiles')
+            .insert(mockProfile);
+
+          if (createError) {
+            console.error('Error creating profile:', createError);
+            // Still set the mock profile even if creation fails
+            setUser(mockProfile);
+          } else {
+            setUser(mockProfile);
+          }
         } else {
           throw error;
         }

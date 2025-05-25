@@ -21,6 +21,7 @@ import NotFound from '@/pages/NotFound';
 import VerifyEmail from '@/pages/VerifyEmail';
 import PrivateRoute from '@/components/PrivateRoute';
 import DashboardLayout from '@/components/DashboardLayout';
+import DocumentEditor from './pages/DocumentEditor';
 
 function App() {
   return (
@@ -70,6 +71,16 @@ function App() {
                       <PrivateRoute>
                         <DashboardLayout>
                           <ProjectDetails />
+                        </DashboardLayout>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/projects/:projectId/document"
+                    element={
+                      <PrivateRoute>
+                        <DashboardLayout>
+                          <DocumentEditor />
                         </DashboardLayout>
                       </PrivateRoute>
                     }

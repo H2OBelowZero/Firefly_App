@@ -49,31 +49,32 @@ const Dashboard = () => {
         description: `Project ${project.name} is ending`
       })));
 
-      // Get deadlines
-      const { data: deadlines, error: deadlinesError } = await supabase
-        .from('deadlines')
-        .select(`
-          *,
-          projects (
-            name
-          )
-        `)
-        .eq('user_id', profile?.id)
-        .gte('due_date', new Date().toISOString())
-        .order('due_date', { ascending: true })
-        .limit(5);
+      // Get deadlines only if profile exists
+      let deadlineEvents: UpcomingEvent[] = [];
+      if (profile?.id) {
+        const { data: deadlines, error: deadlinesError } = await supabase
+          .from('deadlines')
+          .select('*')
+          .eq('user_id', profile.id)
+          .gte('due_date', new Date().toISOString())
+          .order('due_date', { ascending: true })
+          .limit(5);
 
-      if (deadlinesError) throw deadlinesError;
+        if (deadlinesError) throw deadlinesError;
 
-      const deadlineEvents = deadlines.map(deadline => ({
-        id: `deadline-${deadline.id}`,
-        title: `${deadline.projects.name} - ${deadline.title}`,
-        type: 'deadline' as const,
-        date: deadline.due_date,
-        project_id: deadline.project_id,
-        project_name: deadline.projects.name,
-        description: deadline.description
-      }));
+        deadlineEvents = deadlines.map(deadline => {
+          const project = projects.find(p => p.id === deadline.project_id);
+          return {
+            id: `deadline-${deadline.id}`,
+            title: `${project ? project.name : 'Unknown Project'} - ${deadline.title}`,
+            type: 'deadline' as const,
+            date: deadline.due_date,
+            project_id: deadline.project_id,
+            project_name: project ? project.name : 'Unknown Project',
+            description: deadline.description
+          };
+        });
+      }
 
       // Combine and sort all events
       const allEvents = [...projectEvents, ...deadlineEvents]

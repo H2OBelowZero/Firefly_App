@@ -8,6 +8,8 @@ import FloorPlanViewer from "../components/FloorPlanViewer";
 import SANSChecker from "../components/SANSChecker";
 import { ArrowRight, Shield, BookOpen, Users } from "lucide-react";
 import { Link } from "react-router-dom";
+import { registerLicense } from '@syncfusion/ej2-base';
+registerLicense("ORg4AjUWIQA/Gnt2WhhQ1Fac11JW3xNYVF2R2FJe1RzdF9DZkwgOX1dQ19h5XtTcEVhWndceXFdQmY=")
 
 const Index = () => {
   const { user, loading } = useAuth();
