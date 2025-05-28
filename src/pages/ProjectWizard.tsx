@@ -957,72 +957,48 @@ const ProjectWizard = () => {
                 </div>
                 
                 <div className="space-y-2">
-              <Label>Facility Location</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="facility_location.town">Town</Label>
-                  <select
-                    id="facility_location.town"
-                    value={formData.facility_location.town}
-                    onChange={(e) => handleInputChange('facility_location', { ...formData.facility_location, town: e.target.value })}
-                    className={inputStyles}
-                  >
-                    <option value="">Select town</option>
-                    <option value="johannesburg">Johannesburg</option>
-                    <option value="pretoria">Pretoria</option>
-                    <option value="cape_town">Cape Town</option>
-                    <option value="durban">Durban</option>
-                    <option value="port_elizabeth">Port Elizabeth</option>
-                    <option value="bloemfontein">Bloemfontein</option>
-                    <option value="kimberley">Kimberley</option>
-                    <option value="nelspruit">Nelspruit</option>
-                    <option value="polokwane">Polokwane</option>
-                    <option value="mbombela">Mbombela</option>
-                    <option value="bisho">Bisho</option>
-                    <option value="kimberley">Kimberley</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="facility_location.province">Province</Label>
-                  <select
-                    id="facility_location.province"
-                    value={formData.facility_location.province}
-                    onChange={(e) => handleInputChange('facility_location', { ...formData.facility_location, province: e.target.value })}
-                    className={inputStyles}
-                  >
-                    <option value="">Select province</option>
-                    <option value="gauteng">Gauteng</option>
-                    <option value="western_cape">Western Cape</option>
-                    <option value="kwazulu_natal">KwaZulu-Natal</option>
-                    <option value="eastern_cape">Eastern Cape</option>
-                    <option value="limpopo">Limpopo</option>
-                    <option value="mpumalanga">Mpumalanga</option>
-                    <option value="north_west">North West</option>
-                    <option value="free_state">Free State</option>
-                    <option value="northern_cape">Northern Cape</option>
-                  </select>
-              </div>
-            </div>
-            </div>
-
-                <div className="space-y-2">
-              <Label htmlFor="construction_year">Construction Year</Label>
-                    <select 
-                id="construction_year"
-                value={formData.construction_year}
-                onChange={(e) => handleInputChange('construction_year', parseInt(e.target.value))}
-                className={inputStyles}
-              >
-                <option value="">Select year</option>
-                {Array.from({ length: 2024 - 1900 + 1 }, (_, i) => (
-                  <option key={i} value={2024 - i}>
-                    {2024 - i}
-                  </option>
-                ))}
+                  <Label>Facility Location</Label>
+                  <div>
+                    <Label htmlFor="facility_location.town">Town</Label>
+                    <select
+                      id="facility_location.town"
+                      value={formData.facility_location.town}
+                      onChange={(e) => handleInputChange('facility_location', { ...formData.facility_location, town: e.target.value })}
+                      className={inputStyles}
+                    >
+                      <option value="">Select town</option>
+                      <option value="johannesburg">Johannesburg</option>
+                      <option value="pretoria">Pretoria</option>
+                      <option value="cape_town">Cape Town</option>
+                      <option value="durban">Durban</option>
+                      <option value="gqeberha">Gqeberha</option>
+                      <option value="bloemfontein">Bloemfontein</option>
+                      <option value="kimberley">Kimberley</option>
+                      <option value="mbombela">Mbombela</option>
+                      <option value="polokwane">Polokwane</option>
+                      <option value="mafikeng">Mafikeng</option>
+                      <option value="other">Other</option>
                     </select>
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="construction_year">Construction Year</Label>
+                  <select 
+                    id="construction_year"
+                    value={formData.construction_year}
+                    onChange={(e) => handleInputChange('construction_year', parseInt(e.target.value))}
+                    className={inputStyles}
+                  >
+                    <option value="">Select year</option>
+                    {Array.from({ length: 2024 - 1900 + 1 }, (_, i) => (
+                      <option key={i} value={2024 - i}>
+                        {2024 - i}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+            </div>
         );
       case 2:
         return (

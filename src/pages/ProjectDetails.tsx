@@ -432,14 +432,16 @@ Storage Type: ${commodity.storage_type || 'N/A'}
     }
 
     try {
-      console.log('Sending data to n8n:', project);
-      const response = await fetch('https://fireflyapp.app.n8n.cloud/webhook-test/c3d9595b-21fc-475c-b223-cd20ac17f419', {
+      // Create a copy of the project data without the ID
+      const { id, ...projectDataWithoutId } = project;
+      console.log('Sending data to n8n:', projectDataWithoutId);
+      const response = await fetch('https://fireflyn8n.app.n8n.cloud/webhook-test/c3d9595b-21fc-475c-b223-cd20ac17f419', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({project})
+        body: JSON.stringify({project: projectDataWithoutId})
       });
 
       if (!response.ok) {
