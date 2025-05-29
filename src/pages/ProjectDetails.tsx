@@ -465,13 +465,122 @@ Storage Type: ${commodity.storage_type || 'N/A'}
     }
   };
 
+  const sendToDocumentero = async () => {
+    if (!project) {
+      toast.error('No project data available');
+      return;
+    }
+
+    try {
+      // Transform project data into the required format
+      const formattedData = {
+        company_name: project.company_name || '',
+        client_name: project.client_name || '',
+        town: project.facility_location?.town || '',
+        province: project.facility_location?.province || '',
+        facility_process: project.facility_process || '',
+        construction_year: project.construction_year?.toString() || '',
+        no_of_fire_hose_reels: '0', // This needs to be calculated or added to the project data
+        buildings: project.buildings.map(building => ({
+          name: building.name || '',
+          description: building.description || '',
+          classification: building.classification || '',
+          lower_materials: building.lower_wall_materials || '',
+          upper_materials: building.upper_wall_materials || '',
+          classification_description: '', // This needs to be added to the project data
+          total_building_area: building.total_building_area?.toString() || '',
+          aerial_view: building.aerial_view || '',
+          cad_drawing: building.cad_drawing || ''
+        })),
+        areas: project.areas.map(area => ({
+          name: area.name || '',
+          rooms: project.rooms
+            .filter(room => room.area_id === area.id)
+            .map(room => ({
+              name: room.name || '',
+              description: room.description || '',
+              photo: room.photos?.[0] || '' // Using first photo if available
+            })),
+          commodities: project.expected_commodities
+            .filter(commodity => commodity.area_id === area.id)
+            .map(commodity => ({
+              name: commodity.name || '',
+              storage_type: commodity.storage_type || '',
+              category: commodity.category || '',
+              stacking_height: commodity.stacking_height || ''
+            }))
+        })),
+        special_risks: [{
+          diesel_tank_photo: project.special_risks.find(risk => risk.risk_type === 'Diesel Tank')?.photo || '',
+          inverter_image: project.special_risks.find(risk => risk.risk_type === 'Inverter')?.photo || '',
+          pallet_storage_photo: project.special_risks.find(risk => risk.risk_type === 'Pallet Storage')?.photo || ''
+        }],
+        engineer: [{
+          name: '', // This needs to be added to the project data
+          position: '' // This needs to be added to the project data
+        }]
+      };
+
+      const response = await fetch('https://app.documentero.com/api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          document: "A2wAQDytZ1S18SNvkAvg",
+          apiKey: "DHMXSII-AXSU7JY-QO6MEOQ-GPR6PIQ",
+          format: "docx",
+          data: formattedData
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Documentero response error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Data sent to Documentero successfully:', data);
+
+      // Handle the download link from the response
+      if (data.downloadUrl) {
+        // Create a temporary link element
+        const link = document.createElement('a');
+        link.href = data.downloadUrl;
+        link.download = `${project.company_name?.replace(/\s+/g, '_') || 'Project'}_Report.docx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('Document downloaded successfully');
+      } else {
+        toast.error('No download link found in the response');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error sending data to Documentero:', error);
+      toast.error('Failed to send data to Documentero. Please try again.');
+      throw error;
+    }
+  };
+
   const handleEditDocument = async () => {
     try {
-      await sendToN8n();
+      // Send data to both n8n and Documentero
+      await Promise.all([
+        //sendToN8n(),
+        sendToDocumentero()
+      ]);
       navigate(`/projects/${id}/document`);
     } catch (error) {
       console.error('Error in handleEditDocument:', error);
-      // Don't navigate if the n8n request fails
+      // Don't navigate if the requests fail
       toast.error('Failed to prepare document. Please try again.');
     }
   };
