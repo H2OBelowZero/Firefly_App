@@ -980,6 +980,26 @@ const ProjectWizard = () => {
                       <option value="other">Other</option>
                     </select>
                   </div>
+                  <div className="mt-4">
+                    <Label htmlFor="facility_location.province">Province</Label>
+                    <select
+                      id="facility_location.province"
+                      value={formData.facility_location.province}
+                      onChange={(e) => handleInputChange('facility_location', { ...formData.facility_location, province: e.target.value })}
+                      className={inputStyles}
+                    >
+                      <option value="">Select province</option>
+                      <option value="gauteng">Gauteng</option>
+                      <option value="western_cape">Western Cape</option>
+                      <option value="eastern_cape">Eastern Cape</option>
+                      <option value="kwa_zulu_natal">KwaZulu-Natal</option>
+                      <option value="limpopo">Limpopo</option>
+                      <option value="mpumalanga">Mpumalanga</option>
+                      <option value="north_west">North West</option>
+                      <option value="free_state">Free State</option>
+                      <option value="northern_cape">Northern Cape</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-2">

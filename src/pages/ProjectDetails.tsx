@@ -250,29 +250,32 @@ ${project.buildings?.map(building => `
 Building Name: ${building.name || 'N/A'}
 Classification: ${building.classification || 'N/A'}
 Total Area: ${building.total_building_area || 'N/A'}m²
-Construction Materials: ${Object.entries(building.construction_materials || {})
-  .filter(([_, value]) => value === true)
-  .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1))
-  .join(', ')}${building.construction_materials?.other ? `, ${building.construction_materials.other}` : ''}
+Description: ${building.description || 'N/A'}
+Lower Wall Materials: ${building.lower_wall_materials || 'N/A'}
+Upper Wall Materials: ${building.upper_wall_materials || 'N/A'}
 `).join('\n') || 'No buildings data available'}
 
-Zones
------
-${project.zones?.map(zone => `
-Zone Name: ${zone.name || 'N/A'}
-Classification: ${zone.classification || 'N/A'}
-Area: ${zone.area || 'N/A'}m²
-Occupancy Type: ${zone.occupancy_type || 'N/A'}
-`).join('\n') || 'No zones data available'}
+Areas and Rooms
+--------------
+${project.areas?.map(area => `
+Area Name: ${area.name || 'N/A'}
+Rooms:
+${project.rooms
+  .filter(room => room.area_id === area.id)
+  .map(room => `
+  - ${room.name || 'N/A'}
+    Description: ${room.description || 'N/A'}
+  `).join('\n')}
+`).join('\n') || 'No areas data available'}
 
-Fire Protection Systems
-----------------------
-${project.fire_protection_systems?.map(system => `
-System Type: ${system.type || 'N/A'}
-Description: ${system.description || 'N/A'}
-Coverage: ${system.coverage || 'N/A'}
-Maintenance Status: ${system.maintenance_status || 'N/A'}
-`).join('\n') || 'No fire protection systems data available'}
+Commodities
+----------
+${project.expected_commodities?.map(commodity => `
+Name: ${commodity.name || 'N/A'}
+Category: ${commodity.category || 'N/A'}
+Stacking Height: ${commodity.stacking_height || 'N/A'} m
+Storage Type: ${commodity.storage_type || 'N/A'}
+`).join('\n') || 'No commodities data available'}
 
 Special Risks
 ------------
@@ -280,125 +283,8 @@ ${project.special_risks?.map(risk => `
 Risk Type: ${risk.risk_type || 'N/A'}
 Location: ${risk.location || 'N/A'}
 Details: ${risk.details || 'N/A'}
+Description: ${risk.description || 'N/A'}
 `).join('\n') || 'No special risks data available'}
-
-Emergency Procedures
-------------------
-${project.emergency_procedures?.map(procedure => `
-Type: ${procedure.type || 'N/A'}
-Description: ${procedure.description || 'N/A'}
-Responsible Person: ${procedure.responsible_person || 'N/A'}
-Contact Number: ${procedure.contact_number || 'N/A'}
-`).join('\n') || 'No emergency procedures data available'}
-
-Automatic Fire Extinguishment Areas
---------------------------------
-${project.automatic_fire_extinguishment_areas?.map(area => `
-Area Name: ${area.name || 'N/A'}
-Commodity: ${area.commodity_name || 'N/A'}
-Maximum Stacking Height: ${area.maximum_stacking_height || 'N/A'}m
-`).join('\n') || 'No automatic fire extinguishment areas data available'}
-
-Occupancy Separations
--------------------
-Separation Type: ${project.occupancy_separations?.separation_type || 'N/A'}
-Rating: ${project.occupancy_separations?.rating || 'N/A'}
-
-Divisional Separations
---------------------
-Fire Rated Walls: ${project.divisional_separations?.fire_rated_walls ? 'Yes' : 'No'}
-Fire Rated Doors: ${project.divisional_separations?.fire_rated_doors ? 'Yes' : 'No'}
-
-Escape Routes
-------------
-${project.escape_routes?.map(route => `
-Route Name: ${route.name || 'N/A'}
-Travel Distance: ${route.travel_distance || 'N/A'}m
-Width: ${route.width || 'N/A'}m
-`).join('\n') || 'No escape routes data available'}
-
-Emergency Staircases
-------------------
-${project.emergency_staircases?.map(staircase => `
-Staircase Name: ${staircase.name || 'N/A'}
-Width: ${staircase.width || 'N/A'}m
-Fire Rating: ${staircase.fire_rating || 'N/A'}
-Fire Rated: ${staircase.fire_rated ? 'Yes' : 'No'}
-`).join('\n') || 'No emergency staircases data available'}
-
-Signage Items
-------------
-${project.signage_items?.map(sign => `
-Sign Type: ${sign.sign_type || 'N/A'}
-Location: ${sign.location || 'N/A'}
-Photoluminescent: ${sign.photoluminescent || 'N/A'}
-`).join('\n') || 'No signage items data available'}
-
-Emergency Lighting Zones
-----------------------
-${project.emergency_lighting_zones?.map(zone => `
-Zone Name: ${zone.name || 'N/A'}
-Duration: ${zone.duration || 'N/A'} hours
-Lux Level: ${zone.lux_level || 'N/A'} lux
-`).join('\n') || 'No emergency lighting zones data available'}
-
-Fire Hose Reels
---------------
-${project.fire_hose_reels?.map(reel => `
-Location: ${reel.location || 'N/A'}
-Hose Length: ${reel.hose_length || 'N/A'}m
-Coverage Radius: ${reel.coverage_radius || 'N/A'}m
-`).join('\n') || 'No fire hose reels data available'}
-
-Fire Extinguishers
-----------------
-${project.fire_extinguishers?.map(extinguisher => `
-Extinguisher Type: ${extinguisher.extinguisher_type || 'N/A'}
-Location: ${extinguisher.location || 'N/A'}
-Capacity: ${extinguisher.capacity || 'N/A'} liters
-`).join('\n') || 'No fire extinguishers data available'}
-
-Fire Hydrants
-------------
-${project.fire_hydrants?.map(hydrant => `
-Location: ${hydrant.location || 'N/A'}
-Hydrant Type: ${hydrant.hydrant_type || 'N/A'}
-Flow Rate: ${hydrant.flow_rate || 'N/A'} L/min
-`).join('\n') || 'No fire hydrants data available'}
-
-Firewater System
---------------
-Source: ${project.firewater?.source || 'N/A'}
-Capacity: ${project.firewater?.capacity || 'N/A'} liters
-Pressure: ${project.firewater?.pressure || 'N/A'} bar
-
-Fire Detection System
--------------------
-System Type: ${project.fire_detection?.system_type || 'N/A'}
-Number of Zones: ${project.fire_detection?.number_of_zones || 'N/A'}
-Battery Backup: ${project.fire_detection?.battery_backup || 'N/A'} hours
-
-Fire Alarm Panel
---------------
-Panel Layout: ${project.fire_alarm_panel?.panel_layout || 'N/A'}
-Zone Name: ${project.fire_alarm_panel?.zone_name || 'N/A'}
-
-Smoke Ventilation Zones
----------------------
-${project.smoke_ventilation_zones?.map(zone => `
-Zone Name: ${zone.name || 'N/A'}
-Area: ${zone.area || 'N/A'}m²
-Ventilation Rate: ${zone.ventilation_rate || 'N/A'} m³/h
-`).join('\n') || 'No smoke ventilation zones data available'}
-
-Expected Commodities
--------------------
-${project.expected_commodities?.map(commodity => `
-Name: ${commodity.name || 'N/A'}
-Category: ${commodity.category || 'N/A'}
-Stacking Height: ${commodity.stacking_height || 'N/A'} m
-Storage Type: ${commodity.storage_type || 'N/A'}
-`).join('\n') || 'No expected commodities data available'}
       `;
 
       // Create a Blob with the text content
@@ -577,7 +463,8 @@ Storage Type: ${commodity.storage_type || 'N/A'}
         //sendToN8n(),
         sendToDocumentero()
       ]);
-      navigate(`/projects/${id}/document`);
+      // Remove navigation to document editor
+      // navigate(`/projects/${id}/document`);
     } catch (error) {
       console.error('Error in handleEditDocument:', error);
       // Don't navigate if the requests fail
@@ -628,119 +515,14 @@ Storage Type: ${commodity.storage_type || 'N/A'}
           .update({
             name: building.name,
             classification: building.classification,
-            total_building_area: building.total_building_area
+            total_building_area: building.total_building_area,
+            description: building.description,
+            lower_wall_materials: building.lower_wall_materials,
+            upper_wall_materials: building.upper_wall_materials
           })
           .eq('id', building.id);
 
         if (buildingError) throw buildingError;
-
-        if (building.construction_materials) {
-          const { error: materialsError } = await supabase
-            .from('building_construction_materials')
-            .update(building.construction_materials)
-            .eq('building_id', building.id);
-
-          if (materialsError) throw materialsError;
-        }
-      }
-
-      // Update zones
-      for (const zone of project.zones) {
-        const { error: zoneError } = await supabase
-          .from('zones')
-          .update({
-            name: zone.name,
-            classification: zone.classification,
-            area: zone.area,
-            occupancy_type: zone.occupancy_type
-          })
-          .eq('id', zone.id);
-
-        if (zoneError) throw zoneError;
-      }
-
-      // Update special risks
-      for (const risk of project.special_risks) {
-        const { error: riskError } = await supabase
-          .from('special_risks')
-          .update({
-            risk_type: risk.risk_type,
-            location: risk.location,
-            details: risk.details
-          })
-          .eq('id', risk.id);
-
-        if (riskError) throw riskError;
-      }
-
-      // Update fire protection systems
-      for (const system of project.fire_protection_systems) {
-        const { error: systemError } = await supabase
-          .from('fire_protection_systems')
-          .update({
-            type: system.type,
-            coverage: system.coverage,
-            maintenance_status: system.maintenance_status,
-            description: system.description
-          })
-          .eq('id', system.id);
-
-        if (systemError) throw systemError;
-      }
-
-      // Update emergency procedures
-      for (const procedure of project.emergency_procedures) {
-        const { error: procedureError } = await supabase
-          .from('emergency_procedures')
-          .update({
-            type: procedure.type,
-            responsible_person: procedure.responsible_person,
-            contact_number: procedure.contact_number,
-            description: procedure.description
-          })
-          .eq('id', procedure.id);
-
-        if (procedureError) throw procedureError;
-      }
-
-      // Update automatic fire extinguishment areas
-      for (const area of project.automatic_fire_extinguishment_areas) {
-        const { error: areaError } = await supabase
-          .from('automatic_fire_extinguishment_areas')
-          .update({
-            name: area.name,
-            commodity_name: area.commodity_name,
-            maximum_stacking_height: area.maximum_stacking_height
-          })
-          .eq('id', area.id);
-
-        if (areaError) throw areaError;
-      }
-
-      // Update occupancy separations
-      if (project.occupancy_separations) {
-        const { error: occupancyError } = await supabase
-          .from('occupancy_separations')
-          .update({
-            separation_type: project.occupancy_separations.separation_type,
-            rating: project.occupancy_separations.rating
-          })
-          .eq('project_id', id);
-
-        if (occupancyError) throw occupancyError;
-      }
-
-      // Update divisional separations
-      if (project.divisional_separations) {
-        const { error: divisionalError } = await supabase
-          .from('divisional_separations')
-          .update({
-            fire_rated_walls: project.divisional_separations.fire_rated_walls,
-            fire_rated_doors: project.divisional_separations.fire_rated_doors
-          })
-          .eq('project_id', id);
-
-        if (divisionalError) throw divisionalError;
       }
 
       toast.success('Project saved successfully');
