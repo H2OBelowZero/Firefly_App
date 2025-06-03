@@ -482,7 +482,7 @@ Storage Type: ${commodity.storage_type || 'N/A'}
         construction_year: project.construction_year?.toString() || '',
         no_of_fire_hose_reels: '0', // This needs to be calculated or added to the project data
         buildings: project.buildings.map(building => ({
-          name: building.name || '',
+          building_name: building.name || '',
           description: building.description || '',
           classification: building.classification || '',
           lower_materials: building.lower_wall_materials || '',
@@ -493,18 +493,18 @@ Storage Type: ${commodity.storage_type || 'N/A'}
           cad_drawing: building.cad_drawing || ''
         })),
         areas: project.areas.map(area => ({
-          name: area.name || '',
+          area_name: area.name || '',
           rooms: project.rooms
             .filter(room => room.area_id === area.id)
             .map(room => ({
-              name: room.name || '',
+              room_name: room.name || '',
               description: room.description || '',
               photo: room.photos?.[0] || '' // Using first photo if available
             })),
           commodities: project.expected_commodities
             .filter(commodity => commodity.area_id === area.id)
             .map(commodity => ({
-              name: commodity.name || '',
+              commodity_name: commodity.name || '',
               storage_type: commodity.storage_type || '',
               category: commodity.category || '',
               stacking_height: commodity.stacking_height || ''
@@ -549,10 +549,10 @@ Storage Type: ${commodity.storage_type || 'N/A'}
       console.log('Data sent to Documentero successfully:', data);
 
       // Handle the download link from the response
-      if (data.downloadUrl) {
+      if (data.data) {
         // Create a temporary link element
         const link = document.createElement('a');
-        link.href = data.downloadUrl;
+        link.href = data.data;
         link.download = `${project.company_name?.replace(/\s+/g, '_') || 'Project'}_Report.docx`;
         document.body.appendChild(link);
         link.click();
